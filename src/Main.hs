@@ -1,4 +1,5 @@
 import Control.Applicative
+import Control.Monad
 import Data.Array
 import Data.Ix
 import Data.List
@@ -129,34 +130,42 @@ getTheListSameNonEmptyPositions xs =
   else Nothing
 
 hasTheList5SameNonEmptyPositions :: [Position] -> Bool
-hasTheList5SameNonEmptyPositions [] = False
-hasTheList5SameNonEmptyPositions (x:xs) =
+hasTheList5SameNonEmptyPositions = isJust . getTheList5SameNonEmptyPositions
+
+getTheList5SameNonEmptyPositions :: [Position] -> Maybe Position
+getTheList5SameNonEmptyPositions [] = Nothing
+getTheList5SameNonEmptyPositions (x:xs) =
   if length first5 < 5
-  then False
-  else hasTheListSameNonEmptyPositions first5
-    || hasTheList5SameNonEmptyPositions xs
+  then Nothing
+  else getTheListSameNonEmptyPositions first5
+    `mplus` getTheList5SameNonEmptyPositions xs
   where first5 = take 5 (x:xs)
 
 rowToList row = map snd (assocs row)
 
 has5InARow :: Board -> Bool
-has5InARow board = any id $ map has5InARow'
+has5InARow = isJust . get5InARow
+
+get5InARow :: Board -> Maybe Position
+get5InARow board = foldl' mplus Nothing $ map get5InARow'
   $ map (\i -> subarray ((0, i), (5, i)) board) [0..5]
 
-has5InARow' row = hasTheList5SameNonEmptyPositions $ rowToList row
+get5InARow' row = getTheList5SameNonEmptyPositions $ rowToList row
 
-has5Across board = any id $
-  map (hasTheList5SameNonEmptyPositions . rowToList) [rowA, rowB, rowC]
+get5Across board = foldl' mplus Nothing $
+  map (getTheList5SameNonEmptyPositions . rowToList) [rowA, rowB, rowC]
   where rowA = ixmap (0, 5) (\i -> (i, i)) board
         rowB = ixmap (0, 4) (\i -> (i + 1, i)) board
         rowC = ixmap (0, 4) (\i -> (i, i + 1)) board
 
-
 isFinished :: Board -> Bool
-isFinished board = has5InARow board
-  || has5InARow (rotate90Matrix board)
-  || has5Across board
-  || has5Across (rotate90Matrix board)
+isFinished = isJust . getResult
+
+getResult :: Board -> Maybe Position
+getResult board = foldl' mplus Nothing [get5InARow board,
+  get5InARow (rotate90Matrix board),
+  get5Across board,
+  get5Across (rotate90Matrix board)]
     
      
 exampleGame =
