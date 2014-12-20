@@ -2,10 +2,12 @@ import Control.Applicative
 import Data.Array
 import Data.Ix
 import Data.List
+import Data.Maybe
 import Data.Tuple
 import System.Random
 
------
+----- Data. Matrix
+
 type Symmetry i = (i, i, Bool) -> (i, i) -> (i, i)
 
 -- s
@@ -55,14 +57,15 @@ rotate90Matrix = matrixSymmetry rotate270Symmetry
 
 rotate270Matrix :: (Ix i, Integral i) => MatrixSymmetry i e
 rotate270Matrix = matrixSymmetry rotate90Symmetry
------
+
 subarray :: (Ix i) => (i, i) -> Array i e -> Array i e
 subarray = \newBounds -> ixmap newBounds id
 
 insertSubarray :: (Ix i) => Array i e -> Array i e -> Array i e
 insertSubarray subarray mainArray = mainArray // (assocs subarray)
-------
+----- Data.Matrix
 
+----- Data.Pentago
 data Position = Empty | Black | White
   deriving (Eq, Ord, Show)
 
@@ -116,9 +119,14 @@ makeMove :: MoveOrder -> Board -> Board
 makeMove (pos, (q, r)) = rotateBoard q r . placeToken pos
 
 hasTheListSameNonEmptyPositions :: [Position] -> Bool
-hasTheListSameNonEmptyPositions [] = False
-hasTheListSameNonEmptyPositions xs = all id
-  $ map ((&&) <$> (== (head xs)) <*> (/= Empty)) (tail xs)
+hasTheListSameNonEmptyPositions = isJust . getTheListSameNonEmptyPositions
+
+getTheListSameNonEmptyPositions :: [Position] -> Maybe Position
+getTheListSameNonEmptyPositions [] = Nothing
+getTheListSameNonEmptyPositions xs = 
+  if all id $ map ((&&) <$> (== (head xs)) <*> (/= Empty)) (tail xs)
+  then Just $ head xs
+  else Nothing
 
 hasTheList5SameNonEmptyPositions :: [Position] -> Bool
 hasTheList5SameNonEmptyPositions [] = False
@@ -173,26 +181,106 @@ generatePossibleMoveOrders board = do
   rot <- allRotationOrders
   return (pos, rot)
 
-data GameTree = Node Board [GameTree] | Leaf Board
+data PentagoHistoryState = PentagoHistoryState {
+  board :: Board,
+  lastMove :: MoveOrder
+} deriving (Show)
+
+data PentagoGameTree = Node Board [(PentagoGameTree, MoveOrder)]
   deriving (Show)
 
-generateGameTree :: Board -> GameTree
-generateGameTree board 
-  | isFinished board = Leaf board
-  | otherwise = Node board (map generateGameTree (nub . sort $ map
-    (\moveOrder -> makeMove moveOrder board)
-    (generatePossibleMoveOrders board)))
+generatePentagoGameTree :: Board -> PentagoGameTree
+generatePentagoGameTree board 
+  | isFinished board = Node board []
+  | otherwise = Node board (map (swap . fmap generatePentagoGameTree . swap)
+    uniqueChildBoardsWithMoves)
+  where 
+    childBoardsWithMoves = map
+      (\moveOrder -> (makeMove moveOrder board, moveOrder))
+      (generatePossibleMoveOrders board)
+    uniqueChildBoardsWithMoves = nubBy (\x y -> (fst x) == (fst y))
+      . sortBy (\x y -> compare (fst x) (fst y))
+      $ childBoardsWithMoves
 
-sizeOfGameTree :: GameTree -> Int
-sizeOfGameTree (Leaf _) = 1
-sizeOfGameTree (Node _ xs) = 1 + foldl'
-  (\a x -> let z = sizeOfGameTree x in seq z (a + z)) 0 xs
+sizeOfGameTree :: PentagoGameTree -> Int
+sizeOfGameTree (Node _ []) = 1
+sizeOfGameTree (Node _ xs) = 1 + (foldl'
+  (\a x -> let z = (sizeOfGameTree . fst) x in seq z (a + z)) 0 xs)
 
-prune :: Int -> GameTree -> GameTree
-prune 0 (Node a _) = Leaf a
-prune 0 a = a
-prune d (Leaf a) = Leaf a
-prune d (Node a xs) = Node a $ map (prune (d - 1)) xs
+prune :: Int -> PentagoGameTree -> PentagoGameTree
+prune 0 (Node a _) = Node a []
+prune d tree@(Node a []) = tree
+prune d (Node a xs) = Node a $ map (swap . (fmap $ prune (d - 1)) . swap) xs
+
+type Score = Float
+
+maximize :: (RandomGen g) => g -> PentagoGameTree -> (Score, Maybe MoveOrder, g)
+minimize :: (RandomGen g) => g -> PentagoGameTree -> (Score, Maybe MoveOrder, g)
+
+maximize g board = maximize' g Nothing Nothing board Nothing
+minimize g board = minimize' g Nothing Nothing board Nothing
+
+maximize' :: (RandomGen g) => g
+  -> Maybe Score
+  -> Maybe Score
+  -> PentagoGameTree
+  -> Maybe (Score, MoveOrder)
+  -> (Score, Maybe MoveOrder, g)
+
+minimize' :: (RandomGen g) => g
+  -> Maybe Score
+  -> Maybe Score
+  -> PentagoGameTree
+  -> Maybe (Score, MoveOrder)
+  -> (Score, Maybe MoveOrder, g)
+
+maximize' g alpha beta (Node board []) Nothing =
+  (score, Nothing, newG)
+  where (score, newG) = evaluate g board
+
+maximize' g alpha beta (Node _ []) (Just (score, moveOrder)) =
+  (score, Just moveOrder, g)
+
+maximize' g alpha beta (Node board ((childTree, moveOrder):xs)) acc =
+  if isJust beta && score >= fromJust beta
+  then (score, Just moveOrder, newG)
+  else maximize' newG newAlpha beta (Node board xs) newAcc
+  where
+    (score, _, newG) = minimize' g alpha beta childTree Nothing
+    newAcc = case acc of
+      Nothing -> Just (score, moveOrder)
+      Just (accScore, _) -> if score > accScore
+        then Just (score, moveOrder)
+        else acc
+    newAlpha = if isJust alpha
+      then Just $ max (fromJust alpha) score
+      else Just score
+
+minimize' g alpha beta (Node board []) Nothing =
+  (score, Nothing, newG)
+  where (score, newG) = evaluate g board
+
+minimize' g alpha beta (Node _ []) (Just (score, moveOrder)) =
+  (score, Just moveOrder, g)
+
+minimize' g alpha beta (Node board ((childTree, moveOrder):xs)) acc =
+  if isJust alpha && score <= fromJust alpha
+  then (score, Just moveOrder, newG)
+  else minimize' newG alpha newBeta (Node board xs) newAcc
+  where
+    (score, _, newG) = maximize' g alpha beta childTree Nothing
+    newAcc = case acc of
+      Nothing -> Just (score, moveOrder)
+      Just (accScore, _) -> if score > accScore
+        then Just (score, moveOrder)
+        else acc
+    newBeta = if isJust beta
+      then Just $ min (fromJust beta) score
+      else Just score
+
+evaluate = undefined
+-- evaluate :: (RandomGen g) => g -> Board -> Score
+-- evaluate = if isFinished
 
 -- evaluateGame :: (RandomGen g) -> g -> Board -> (RandomGen, Result)
 -- evaluateGame random board =
