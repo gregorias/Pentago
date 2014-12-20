@@ -226,19 +226,19 @@ type Score = Float
 maximize :: (RandomGen g) => g -> PentagoGameTree -> (Score, Maybe MoveOrder, g)
 minimize :: (RandomGen g) => g -> PentagoGameTree -> (Score, Maybe MoveOrder, g)
 
-maximize g board = maximize' g Nothing Nothing board Nothing
-minimize g board = minimize' g Nothing Nothing board Nothing
+maximize g board = maximize' g (-1.0) 1.0 board Nothing
+minimize g board = minimize' g (-1.0) 1.0 board Nothing
 
 maximize' :: (RandomGen g) => g
-  -> Maybe Score
-  -> Maybe Score
+  -> Score
+  -> Score
   -> PentagoGameTree
   -> Maybe (Score, MoveOrder)
   -> (Score, Maybe MoveOrder, g)
 
 minimize' :: (RandomGen g) => g
-  -> Maybe Score
-  -> Maybe Score
+  -> Score
+  -> Score
   -> PentagoGameTree
   -> Maybe (Score, MoveOrder)
   -> (Score, Maybe MoveOrder, g)
@@ -251,7 +251,7 @@ maximize' g alpha beta (Node _ []) (Just (score, moveOrder)) =
   (score, Just moveOrder, g)
 
 maximize' g alpha beta (Node board ((childTree, moveOrder):xs)) acc =
-  if isJust beta && score >= fromJust beta
+  if score >= beta
   then (score, Just moveOrder, newG)
   else maximize' newG newAlpha beta (Node board xs) newAcc
   where
@@ -261,9 +261,7 @@ maximize' g alpha beta (Node board ((childTree, moveOrder):xs)) acc =
       Just (accScore, _) -> if score > accScore
         then Just (score, moveOrder)
         else acc
-    newAlpha = if isJust alpha
-      then Just $ max (fromJust alpha) score
-      else Just score
+    newAlpha = max alpha score
 
 minimize' g alpha beta (Node board []) Nothing =
   (score, Nothing, newG)
@@ -273,7 +271,7 @@ minimize' g alpha beta (Node _ []) (Just (score, moveOrder)) =
   (score, Just moveOrder, g)
 
 minimize' g alpha beta (Node board ((childTree, moveOrder):xs)) acc =
-  if isJust alpha && score <= fromJust alpha
+  if score <= alpha
   then (score, Just moveOrder, newG)
   else minimize' newG alpha newBeta (Node board xs) newAcc
   where
@@ -283,20 +281,13 @@ minimize' g alpha beta (Node board ((childTree, moveOrder):xs)) acc =
       Just (accScore, _) -> if score > accScore
         then Just (score, moveOrder)
         else acc
-    newBeta = if isJust beta
-      then Just $ min (fromJust beta) score
-      else Just score
+    newBeta = min beta score
 
-evaluate = undefined
--- evaluate :: (RandomGen g) => g -> Board -> Score
--- evaluate = if isFinished
-
--- evaluateGame :: (RandomGen g) -> g -> Board -> (RandomGen, Result)
--- evaluateGame random board =
-  -- let maybeResult = calculateResult board
-  -- case maybeResult of
-    -- Nothing -> evaluateGame 
-    -- Just result -> (random, result)
+evaluate :: (RandomGen g) => g -> Board -> (Score, g)
+evaluate g board = case getResult board of
+  Nothing -> (0.0, g)
+  Just White -> (1.0, g)
+  Just Black -> (-1.0, g)
 
 --  if isFinished board then 
 
