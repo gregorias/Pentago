@@ -1,3 +1,4 @@
+module Main where
 import Control.Applicative
 import Control.Monad
 import Data.Array
@@ -8,7 +9,6 @@ import Data.Tuple
 import System.Random
 
 ----- Data. Matrix
-
 type Symmetry i = (i, i, Bool) -> (i, i) -> (i, i)
 
 -- s
@@ -289,8 +289,4 @@ evaluate g board = case getResult board of
   Just White -> (1.0, g)
   Just Black -> (-1.0, g)
 
---  if isFinished board then 
-
-
--- generatePositions :: Board -> [Board]
--- generatePositions board
+main = return () :: IO ()
