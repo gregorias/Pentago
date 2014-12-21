@@ -1,7 +1,10 @@
 module Pentago.AI.MinMax(
   SMTree, 
   maximize,
-  minimize) where
+  minimize,
+  maximize',
+  minimize'
+  ) where
 
 import Pentago.Data.Tree
 

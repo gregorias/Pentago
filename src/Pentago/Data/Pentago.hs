@@ -20,6 +20,7 @@ module Pentago.Data.Pentago(
   getResult,
   generatePossiblePlacementOrders,
   generatePossibleMoveOrders,
+  prettyShowBoard
   ) where
 
 import Pentago.Data.Matrix
@@ -57,7 +58,7 @@ data Result = BlackWin | Draw | WhiteWin
 quadrantToBounds :: Quadrant -> ((Int, Int), (Int, Int))
 quadrantToBounds RightTop = ((3, 0), (5, 2))
 quadrantToBounds LeftTop = ((0, 0), (2, 2))
-quadrantToBounds LeftBottom = ((0, 2), (3, 5))
+quadrantToBounds LeftBottom = ((0, 3), (2, 5))
 quadrantToBounds RightBottom = ((3, 3), (5, 5))
 
 rotationDirectionToMatrixSymmetry :: (Ix i, Integral i) =>
@@ -162,3 +163,19 @@ generatePossibleMoveOrders board = do
   pos <- generatePossiblePlacementOrders board
   rot <- allRotationOrders
   return (pos, rot)
+
+prettyPrintPosition White = "o"
+prettyPrintPosition Black = "x"
+prettyPrintPosition Empty = "."
+
+prettyPrintRow :: [Position] -> String
+prettyPrintRow row = (foldr (\x a -> "| " ++ (prettyPrintPosition x) ++ " " ++ a) "" row)
+  ++ "|"
+
+boardToRows :: Board -> [[Position]]
+boardToRows board = map (\i -> elems (subarray ((0, i), (5, i)) board)) [0..5]
+  
+prettyShowBoard :: Board -> String
+prettyShowBoard board = rowSep ++ (concat $ map (\row -> prettyPrintRow row ++ "\n" ++ rowSep) (boardToRows board))
+  where
+    rowSep = (take 25 $ cycle ['-']) ++ "\n"

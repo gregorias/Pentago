@@ -47,10 +47,8 @@ evaluateTree evaluateF gameTree = traverse evaluateF leafTree
   where
     leafTree = toLeafValueTree gameTree
 
--- trivialEvaluate :: Board  Board -> PentagoEvalutionTree
---evaluateTree' board = case getResult board of
-  --Nothing -> 0.0
-  --Just WhiteWin -> 1.0
-  --Just BlackWin -> -1.0
-
--- simpleEvaluateBoard = 
+trivialEvaluate :: (Applicative f) => Board -> f Score
+trivialEvaluate board = case getResult board of
+  Nothing -> pure $ 0.0
+  Just WhiteWin -> pure $ 1.0
+  Just BlackWin -> pure $ (-1.0)
