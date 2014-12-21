@@ -1,4 +1,4 @@
-module Data.Pentago(
+module Pentago.Data.Pentago(
   Player(..),
   Position(..),
   Quadrant(..),
@@ -22,7 +22,7 @@ module Data.Pentago(
   generatePossibleMoveOrders,
   ) where
 
-import Data.Matrix
+import Pentago.Data.Matrix
 
 import Control.Applicative
 import Control.Monad

@@ -1,4 +1,4 @@
-module Data.Matrix where
+module Pentago.Data.Matrix where
 
 import Data.Array
 import Data.Tuple

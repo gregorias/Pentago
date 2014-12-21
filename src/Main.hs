@@ -1,9 +1,9 @@
 module Main where
 
-import Data.Matrix
-import Data.Pentago
-import AI.MinMax
-import AI.Pentago
+import Pentago.Data.Matrix
+import Pentago.Data.Pentago
+import Pentago.AI.MinMax
+import Pentago.AI.Pentago
 
 import Data.Array
 import Data.Ix
@@ -26,7 +26,7 @@ exampleGame =
 
 main = testSpeed
 
-testSpeed = putStrLn . show $ sizeOfGameTree . prune 2 $ g
+testSpeed = putStrLn . show $ sizeOfGameTree . prune 3 $ g
   where
     e = emptyBoard
     f = exampleGame e
