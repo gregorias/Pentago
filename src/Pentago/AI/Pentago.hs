@@ -5,11 +5,13 @@ import Pentago.Data.Matrix
 import Pentago.Data.Pentago
 import Pentago.Data.Tree
 
+import Control.Applicative
 import Data.Foldable
 import Data.Function
 import Data.List
 import Data.Monoid
 import Data.Tuple
+import Data.Traversable
 import qualified Data.Set
 
 type PentagoGameTree = EdgeTree MoveOrder Board
@@ -38,8 +40,17 @@ prune d (ValueNode a xs) = ValueNode a $ map (fmap $ prune (d - 1)) xs
 
 type Score = Float
 
-evaluate :: Board -> Score
-evaluate board = case getResult board of
-  Nothing -> 0.0
-  Just WhiteWin -> 1.0
-  Just BlackWin -> -1.0
+type PentagoEvalutionTree = LeafValueTree MoveOrder Score
+
+evaluateTree :: (Applicative f) => (Board -> f Score) -> PentagoGameTree -> f PentagoEvalutionTree
+evaluateTree evaluateF gameTree = traverse evaluateF leafTree
+  where
+    leafTree = toLeafValueTree gameTree
+
+-- trivialEvaluate :: Board  Board -> PentagoEvalutionTree
+--evaluateTree' board = case getResult board of
+  --Nothing -> 0.0
+  --Just WhiteWin -> 1.0
+  --Just BlackWin -> -1.0
+
+-- simpleEvaluateBoard = 
