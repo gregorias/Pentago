@@ -2,12 +2,14 @@ module Main(
   module Main,
   module Pentago.Data.Matrix,
   module Pentago.Data.Pentago,
+  module Pentago.Data.Tree,
   module Pentago.AI.MinMax,
   module Pentago.AI.Pentago,
   ) where
 
 import Pentago.Data.Matrix
 import Pentago.Data.Pentago
+import Pentago.Data.Tree
 import Pentago.AI.MinMax
 import Pentago.AI.Pentago
 
@@ -58,7 +60,8 @@ testSpeed = putStrLn . show $ sizeOfGameTree . prune 2 $ g
     f2 = f // [((4,4), Empty)]
     g = generatePentagoGameTree f2
 
-
+data S = M | Z | P deriving (Show, Ord, Eq, Bounded)
+testT = Node [(0, Node [(1, Leaf Z)]), (2, Node [(3, Leaf P), undefined])]
 
 testMaximize = runIdentity $ evaluateTree trivialEvaluate . prune 1 $ g
   where

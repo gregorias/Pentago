@@ -1,10 +1,7 @@
 module Pentago.AI.MinMax(
   SMTree, 
   maximize,
-  minimize,
-  maximize',
-  minimize'
-  ) where
+  minimize) where
 
 import Pentago.Data.Tree
 
@@ -66,7 +63,7 @@ minimize' alpha beta (Node ((move, childTree):xs)) acc =
     (score, _) = maximize' alpha beta childTree Nothing
     newAcc = case acc of
       Nothing -> Just (score, move)
-      Just (accScore, _) -> if score > accScore
+      Just (accScore, _) -> if score < accScore
         then Just (score, move)
         else acc
     newBeta = min beta score

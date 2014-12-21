@@ -6,12 +6,14 @@ import Pentago.Data.Pentago
 import Pentago.Data.Tree
 
 import Control.Applicative
+import Control.Monad.State
 import Data.Foldable
 import Data.Function
 import Data.List
 import Data.Monoid
 import Data.Tuple
 import Data.Traversable
+import System.Random
 import qualified Data.Set
 
 type PentagoGameTree = EdgeTree MoveOrder Board
@@ -52,3 +54,12 @@ trivialEvaluate board = case getResult board of
   Nothing -> pure $ 0.0
   Just WhiteWin -> pure $ 1.0
   Just BlackWin -> pure $ (-1.0)
+
+randomPlayEvaluate :: (RandomGen g) => Board -> State g Score
+randomPlayEvaluate = undefined
+
+randomPlay :: (RandomGen g) => Board -> State g Result
+randomPlay = undefined
+
+playGame :: [(MoveOrder)] -> Board -> Board
+playGame = undefined
