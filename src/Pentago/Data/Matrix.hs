@@ -16,8 +16,8 @@ transposeSymmetry (cX, cY, _) (x, y) = (cX + (y - cY), cY + (x - cX))
 
 -- sr^2
 verticalSymmetry :: (Integral i) => Symmetry i
-verticalSymmetry center = swap . horizontalSymmetry (mySwap center) . swap 
-  where mySwap (x, y, c) = (y, x, c)
+verticalSymmetry (cX, _, True) = fmap (2 * cX + 1 -)
+verticalSymmetry (cX, _, _) = fmap (2 * cX -)
 
 -- r^2
 rotate180Symmetry :: (Integral i) => Symmetry i
