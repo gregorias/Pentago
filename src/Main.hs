@@ -12,6 +12,7 @@ import Pentago.Data.Tree
 import Pentago.AI.MinMax
 import qualified Pentago.AI.Pentago as AP
 
+import Control.Applicative
 import Control.Monad.Identity
 import Control.Monad.State
 import Data.Array
@@ -26,37 +27,94 @@ import System.Random
 
 ----- Data.Pentago
     
-exampleGame =
-  makeMove ((0,0), (RightTop, RightRotation))
-  . makeMove ((0,1), (RightTop, RightRotation))
-  . makeMove ((1,1), (RightTop, RightRotation))
-  . makeMove ((0,2), (RightTop, RightRotation))
-  . makeMove ((2,2), (RightTop, RightRotation))
-  . makeMove ((0,3), (RightTop, RightRotation))
-  . makeMove ((3,3), (RightTop, RightRotation))
-  . makeMove ((0,4), (RightTop, RightRotation))
-  . makeMove ((4,4), (RightTop, RightRotation))
-
-beginningGame =
-  makeMove ((1,1), (RightTop, RightRotation))
-  . makeMove ((4,4), (RightTop, RightRotation))
-  . makeMove ((1,4), (RightTop, RightRotation))
-  . makeMove ((4,1), (RightTop, RightRotation))
-  . makeMove ((2,1), (RightTop, RightRotation))
-
-main = runStateT runGame
-  (SessionState initialGameState
-    (mkStdGen 10)
+main = runStateT mainMenu
+  (MainMenuState 
     (Player (aiPlayerWrapper AP.randomAIPlayer) "AI 0")
     (Player (aiPlayerWrapper AP.randomAIPlayer) "AI 1"))
 
-whichMinMax state =
-  case whoseTurn state of
-    Just WhitePlayer -> maximize
-    Just BlackPlayer -> minimize
+-- main menu
 
-moveHelp = "Provide move order of form (posX, posY) (quadrant, rotation), "
-  ++ "where pos in [0,5], quadrant in {RT, LT, LB, RB}, rotation in {L,R}]"
+data MainMenuState = MainMenuState {
+  firstPlayer :: Player,
+  secondPlayer :: Player
+}
+
+mainMenuString =
+  "1) Start game" ++ "\n"
+  ++ "2) Configure" ++ "\n"
+  ++ "3) Exit" ++ "\n"
+ 
+mainMenu :: StateT MainMenuState IO ()
+mainMenu = do
+  liftIO $ putStr mainMenuString
+  option <- head <$> liftIO getLine
+  liftIO $ putStrLn ""
+  if option == '1'
+  then do
+    curPlayer <- firstPlayer <$> get
+    nextPlayer <- secondPlayer <$> get
+    lift $ do
+      stdGen <- newStdGen
+      runStateT runGame
+        $ SessionState initialGameState stdGen curPlayer nextPlayer
+    mainMenu
+  else if option == '2'
+  then do
+    configurationMenu
+    mainMenu
+  else
+    return ()
+
+-- configuration menu
+switchPlayer :: Player -> Player
+switchPlayer player = 
+  if playerName == "Human"
+  then Player (aiPlayerWrapper AP.randomAIPlayer) ("AI " ++ idx)
+  else Player (humanPlayerWrapper) ("Human " ++ idx)
+  where (playerName:(idx:[])) = words $ name player
+
+configurationMenuString =
+  "1) Switch first player" ++ "\n"
+  ++ "2) Switch second player" ++ "\n"
+  ++ "3) Go to main menu" ++ "\n"
+
+showCurrentState :: MainMenuState -> IO ()
+showCurrentState mainMenuState = do
+  putStrLn $ "1. player: " ++ (name . firstPlayer $ mainMenuState)
+  putStrLn $ "2. player: " ++ (name . secondPlayer $ mainMenuState)
+
+configurationMenuMainLoop :: IO Char
+configurationMenuMainLoop = do
+  putStr configurationMenuString
+  head <$> getLine
+
+configurationMenu :: StateT MainMenuState IO ()
+configurationMenu = do
+  mainMenuState <- get
+  let curFirstPlayer = firstPlayer mainMenuState
+      curSecondPlayer = secondPlayer mainMenuState
+  which <- lift $ do 
+    showCurrentState mainMenuState
+    putStrLn ""
+    option <- configurationMenuMainLoop
+    putStrLn ""
+    if option == '1'
+    then return 1
+    else if option == '2'
+    then return 2
+    else return 3
+  if which == 1
+  then do
+    put $ MainMenuState (switchPlayer curFirstPlayer) curSecondPlayer
+    configurationMenu
+  else if which == 2
+  then do
+    put $ MainMenuState curFirstPlayer (switchPlayer curSecondPlayer)
+    configurationMenu
+  else
+    return ()
+
+-- runGame
 
 data Player = Player {
   playerWrapper :: PlayerWrapper,
@@ -111,6 +169,15 @@ humanPlayer state = do
 
 humanPlayerWrapper :: PlayerWrapper
 humanPlayerWrapper = lift . humanPlayer
+
+whichMinMax state =
+  case whoseTurn state of
+    Just WhitePlayer -> maximize
+    Just BlackPlayer -> minimize
+
+moveHelp = "Provide move order of form posX posY quadrant rotation, "
+  ++ "where pos in [0,5], quadrant in {RT, LT, LB, RB}, rotation in {L,R}]"
+-- main Menu
 
 parsePosition :: Parser Int
 parsePosition = do
