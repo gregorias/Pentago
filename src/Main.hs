@@ -136,7 +136,7 @@ playWithAI = do
   else if isAI $ curPlayer state
   then do
     let (nextGameState, newState) =
-          runState (aiPlay (curGameState)) (randomGen state)
+          runState (randomAIPlayer (curGameState)) (randomGen state)
     put $ SessionState nextGameState (newState) (nextPlayer state)
       (curPlayer state)
     playWithAI

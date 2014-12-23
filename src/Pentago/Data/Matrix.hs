@@ -1,6 +1,11 @@
+{-|
+Module : Pentago.Data.Matrix
+Description :  Basic square matrix/array operations
+
+Basic square matrix/array operations
+-}
 module Pentago.Data.Matrix(
   MatrixSymmetry,
-  matrixSymmetry,
   rotate90Matrix,
   rotate270Matrix,
   subarray,
@@ -9,7 +14,10 @@ module Pentago.Data.Matrix(
 import Data.Array
 import Data.Tuple
 
-type Symmetry i = (i, i, Bool) -> (i, i) -> (i, i)
+-- Function type containing symmetry operations on array indexes.
+type Symmetry i = (i, i, Bool) -- ^ YOLO
+                  -> (i, i) -- ^ASD
+                  -> (i, i) -- ^DS
 
 -- s
 horizontalSymmetry :: (Integral i) => Symmetry i
@@ -39,6 +47,7 @@ rotate270Symmetry center = transposeSymmetry center . horizontalSymmetry center
 
 -- TODO quickcheck that transpose . transpose = id
 
+-- |Group symmetry operations on square matrix
 type MatrixSymmetry i e = Array (i, i) e -> Array (i,i) e
 
 matrixSymmetry :: (Ix i, Integral i) => Symmetry i -> MatrixSymmetry i e
@@ -47,20 +56,26 @@ matrixSymmetry symmetry matrix = ixmap (bounds matrix) (symmetry center) matrix
     ((begX, begY), (endX, endY)) = bounds matrix
     center = (div (begX + endX) 2, div (begY + endY) 2, even $ endY - begY + 1)
 
+-- |Perform OY symmetry on a matrix
 horizontalMatrixSymmetry :: (Ix i, Integral i) => MatrixSymmetry i e
 horizontalMatrixSymmetry = matrixSymmetry horizontalSymmetry
 
+-- |Perform OX symmetry on a matrix
 verticalMatrixSymmetry :: (Ix i, Integral i) => MatrixSymmetry i e
 verticalMatrixSymmetry = matrixSymmetry verticalSymmetry
 
+-- |Perform left rotation on a matrix
 rotate90Matrix :: (Ix i, Integral i) => MatrixSymmetry i e
 rotate90Matrix = matrixSymmetry rotate270Symmetry
 
+-- |Perform right rotation on a matrix
 rotate270Matrix :: (Ix i, Integral i) => MatrixSymmetry i e
 rotate270Matrix = matrixSymmetry rotate90Symmetry
 
+-- |Get subarray bounded by indexes
 subarray :: (Ix i) => (i, i) -> Array i e -> Array i e
 subarray = \newBounds -> ixmap newBounds id
 
+-- |Insert subarray into array
 insertSubarray :: (Ix i) => Array i e -> Array i e -> Array i e
 insertSubarray subarray mainArray = mainArray // (assocs subarray)

@@ -1,3 +1,9 @@
+{-|
+Module : Pentago.AI.MinMax
+Description : Implementations of alfa-beta minmax algorithm functions
+
+Implementations of alfa-beta minmax algorithm functions
+-}
 module Pentago.AI.MinMax(
   SMTree, 
   maximize,
@@ -5,14 +11,14 @@ module Pentago.AI.MinMax(
 
 import Pentago.Data.Tree
 
--- ScoreMoveTree
+-- | ScoreMoveTree
 type SMTree e v = LeafValueTree e v
 
--- TODO how to eliminate min max duality
-
+-- | Find a move which maximizes eventual score value
 maximize :: (Bounded v, Ord v) => SMTree e v -> (v, Maybe e)
 maximize smTree = maximize' (minBound) (maxBound) smTree Nothing
 
+-- | Find a move which minimizes eventual score value
 minimize :: (Bounded v, Ord v) => SMTree e v -> (v, Maybe e)
 minimize smTree = minimize' (minBound) (maxBound) smTree Nothing
 

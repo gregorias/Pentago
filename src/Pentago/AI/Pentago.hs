@@ -1,8 +1,14 @@
+{-|
+Module : Pentago.AI.Pentago
+Description : Implementation of Pentago AI
+
+Implementation of Pentago AI
+-}
 module Pentago.AI.Pentago(
   Player,
   HumanPlayer,
-  RandomAIPlayer,
-  aiPlay
+  AIPlayer,
+  randomAIPlayer
 ) where
 
 import Pentago.AI.MinMax
@@ -24,6 +30,7 @@ import qualified Data.Set
 
 type PentagoGameTree = EdgeTree MoveOrder GameState
 
+-- | Generate complete game tree from current state to all possible states
 generatePentagoGameTree :: GameState -> PentagoGameTree
 generatePentagoGameTree state
   | isFinished state = ValueNode state []
@@ -107,11 +114,13 @@ randomPlay state = case getResult state of
     randomPlay $ makeMove moveOrder state
   Just result -> return (state, result)
 
+-- | Pentago player is a function from current game state to monadic evaluation
+-- returning next game state
 type Player m = GameState -> m GameState
 
 type HumanPlayer = Pentago.AI.Pentago.Player IO
 
-type RandomAIPlayer g = Pentago.AI.Pentago.Player (State g)
+type AIPlayer g = Pentago.AI.Pentago.Player (State g)
 
 aiEvaluate :: (RandomGen g) => Int
   -> GameState
@@ -120,8 +129,8 @@ aiEvaluate depth state = evaluateTree randomPlayEvaluate
   . prune depth
   . generatePentagoGameTree $ state
 
-aiPlay :: (RandomGen g) => RandomAIPlayer g
-aiPlay state = 
+randomAIPlayer :: (RandomGen g) => AIPlayer g
+randomAIPlayer state = 
   let possibleMovesCount = length $ generatePossiblePlacementOrders state
       depth = if possibleMovesCount > 15
               then 1

@@ -1,3 +1,9 @@
+{-|
+Module : Pentago.Data.Pentago
+Description : Types and operations representing a Pentago game
+
+Types and operations representing a Pentago game
+-}
 module Pentago.Data.Pentago(
   Player(..),
   Position(..),
