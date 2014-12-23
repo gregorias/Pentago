@@ -4,14 +4,13 @@ module Main(
   module Pentago.Data.Pentago,
   module Pentago.Data.Tree,
   module Pentago.AI.MinMax,
-  module Pentago.AI.Pentago,
   ) where
 
 import Pentago.Data.Matrix
 import Pentago.Data.Pentago hiding (Player)
 import Pentago.Data.Tree
 import Pentago.AI.MinMax
-import Pentago.AI.Pentago
+import qualified Pentago.AI.Pentago as AP
 
 import Control.Monad.Identity
 import Control.Monad.State
@@ -45,24 +44,11 @@ beginningGame =
   . makeMove ((4,1), (RightTop, RightRotation))
   . makeMove ((2,1), (RightTop, RightRotation))
 
-main = do
-  (result, _) <- runStateT
-    playWithAI
-    (SessionState initialGameState (mkStdGen 1) (AI "0") (AI "1"))
-  putStrLn . show $ result
-
-data TurnOrder = Player | AI String deriving (Show)
-
-isAI :: TurnOrder -> Bool
-isAI (AI _) = True
-isAI _ = False
-  
-data SessionState = SessionState {
-  gameState :: GameState,
-  randomGen :: StdGen,
-  curPlayer :: TurnOrder,
-  nextPlayer :: TurnOrder
-} deriving Show
+main = runStateT runGame
+  (SessionState initialGameState
+    (mkStdGen 10)
+    (Player (aiPlayerWrapper AP.randomAIPlayer) "AI 0")
+    (Player (aiPlayerWrapper AP.randomAIPlayer) "AI 1"))
 
 whichMinMax state =
   case whoseTurn state of
@@ -71,6 +57,60 @@ whichMinMax state =
 
 moveHelp = "Provide move order of form (posX, posY) (quadrant, rotation), "
   ++ "where pos in [0,5], quadrant in {RT, LT, LB, RB}, rotation in {L,R}]"
+
+data Player = Player {
+  playerWrapper :: PlayerWrapper,
+  name :: String
+}
+  
+data SessionState = SessionState {
+  gameState :: GameState,
+  randomGen :: StdGen,
+  curPlayer :: Player,
+  nextPlayer :: Player
+}
+
+runGame :: StateT SessionState IO ()
+runGame = do
+  sessionState <- get
+  let curGameState = gameState sessionState
+  liftIO . putStr . prettyShowBoard . board $ curGameState
+  if isFinished curGameState
+  then do
+    liftIO . putStrLn
+      $ (show . name $ nextPlayer sessionState) ++ " has won!"
+  else do
+    let curPlayerWrapper = playerWrapper . curPlayer $ sessionState
+    (newGameState, newPlayerState) <- liftIO
+      . runStateT (curPlayerWrapper curGameState) 
+      $ (randomGen sessionState)
+    put $ SessionState
+      newGameState
+      (newPlayerState)
+      (nextPlayer sessionState)
+      (curPlayer sessionState)
+    runGame
+
+type PlayerWrapperMonad = StateT StdGen IO
+
+type PlayerWrapper = AP.Player PlayerWrapperMonad
+
+aiPlayerWrapper :: AP.AIPlayer StdGen -> PlayerWrapper
+aiPlayerWrapper aiPlayer =
+  \board -> do
+    gen <- get
+    let (newState, newGen) = runState (aiPlayer board) gen
+    put newGen
+    return newState
+
+humanPlayer :: AP.HumanPlayer
+humanPlayer state = do
+  putStrLn $ moveHelp
+  moveOrder <- readMoveOrder
+  return $ makeMove moveOrder state
+
+humanPlayerWrapper :: PlayerWrapper
+humanPlayerWrapper = lift . humanPlayer
 
 parsePosition :: Parser Int
 parsePosition = do
@@ -123,31 +163,3 @@ readMoveOrder = do
   case parse parseMoveOrder "MoveOrder Parser" line of
     Left err -> putStrLn (show err) >> readMoveOrder
     Right moveOrder -> return moveOrder
-
-playWithAI :: StateT SessionState IO Result
-playWithAI = do
-  state <- get
-  let curGameState = gameState state
-  liftIO . putStr . prettyShowBoard . board $ curGameState
-  if isFinished curGameState
-  then do
-    liftIO . putStrLn $ (show $ nextPlayer state) ++ "has won!"
-    return . fromJust . getResult $ curGameState
-  else if isAI $ curPlayer state
-  then do
-    let (nextGameState, newState) =
-          runState (randomAIPlayer (curGameState)) (randomGen state)
-    put $ SessionState nextGameState (newState) (nextPlayer state)
-      (curPlayer state)
-    playWithAI
-  else do
-    nextGameState <- liftIO . humanPlay $ curGameState
-    put $ SessionState nextGameState
-      (randomGen state) (nextPlayer state) (curPlayer state)
-    playWithAI
-
-humanPlay :: HumanPlayer
-humanPlay state = do
-  putStrLn $ moveHelp
-  moveOrder <- readMoveOrder
-  return $ makeMove moveOrder state
