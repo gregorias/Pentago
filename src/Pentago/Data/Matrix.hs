@@ -1,4 +1,10 @@
-module Pentago.Data.Matrix where
+module Pentago.Data.Matrix(
+  MatrixSymmetry,
+  matrixSymmetry,
+  rotate90Matrix,
+  rotate270Matrix,
+  subarray,
+  insertSubarray) where
 
 import Data.Array
 import Data.Tuple

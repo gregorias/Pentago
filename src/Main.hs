@@ -46,36 +46,10 @@ beginningGame =
   . makeMove ((2,1), (RightTop, RightRotation))
 
 main = do
-  (result, _) <-
-    runStateT playWithAI (GameState emptyBoard (mkStdGen 1) (AI "0") (AI "1"))
+  (result, _) <- runStateT
+    playWithAI
+    (SessionState initialGameState (mkStdGen 1) (AI "0") (AI "1"))
   putStrLn . show $ result
-
-findBestMove depth f evaluate = f
-  . runIdentity
-  . evaluateTree evaluate
-  . prune depth
-  . generatePentagoGameTree
-
-makeBestMove depth f board = makeMove
-  (fromJust . snd $ findBestMove depth f trivialEvaluate board)
-  board
-
-testSpeed = putStrLn . show $ sizeOfGameTree . prune 2 $ g
-  where
-    e = emptyBoard
-    f = exampleGame e
-    f2 = f // [((4,4), Empty)]
-    g = generatePentagoGameTree f2
-
-data S = M | Z | P deriving (Show, Ord, Eq, Bounded)
-testT = Node [(0, Node [(1, Leaf Z)]), (2, Node [(3, Leaf P), undefined])]
-
-testMaximize = runIdentity $ evaluateTree trivialEvaluate . prune 1 $ g
-  where
-    e = emptyBoard
-    f = exampleGame e
-    f2 = f // [((4,4), Empty)]
-    g = generatePentagoGameTree f2
 
 data TurnOrder = Player | AI String deriving (Show)
 
@@ -83,17 +57,15 @@ isAI :: TurnOrder -> Bool
 isAI (AI _) = True
 isAI _ = False
   
-data GameState = GameState {
-  board :: Board,
+data SessionState = SessionState {
+  gameState :: GameState,
   randomGen :: StdGen,
   curPlayer :: TurnOrder,
   nextPlayer :: TurnOrder
 } deriving Show
 
-newGameState = GameState emptyBoard (mkStdGen 0) Player (AI "0")
-
-whichMinMax board =
-  case whoseTurn board of
+whichMinMax state =
+  case whoseTurn state of
     Just WhitePlayer -> maximize
     Just BlackPlayer -> minimize
 
@@ -152,30 +124,30 @@ readMoveOrder = do
     Left err -> putStrLn (show err) >> readMoveOrder
     Right moveOrder -> return moveOrder
 
-playWithAI :: StateT GameState IO Result
+playWithAI :: StateT SessionState IO Result
 playWithAI = do
   state <- get
-  let curBoard = board state
-  liftIO . putStr $ prettyShowBoard curBoard
-  if isFinished curBoard
+  let curGameState = gameState state
+  liftIO . putStr . prettyShowBoard . board $ curGameState
+  if isFinished curGameState
   then do
     liftIO . putStrLn $ (show $ nextPlayer state) ++ "has won!"
-    return . fromJust . getResult $ curBoard
+    return . fromJust . getResult $ curGameState
   else if isAI $ curPlayer state
   then do
-    let (nextBoard, newState) = runState (aiPlay (curBoard)) (randomGen state)
-    put $ GameState nextBoard (newState) (nextPlayer state) (curPlayer state)
+    let (nextGameState, newState) =
+          runState (aiPlay (curGameState)) (randomGen state)
+    put $ SessionState nextGameState (newState) (nextPlayer state)
+      (curPlayer state)
     playWithAI
-    -- let nextBoard = makeBestMove 2 (whichMinMax curBoard) curBoard
-    -- put $ GameState nextBoard (nextPlayer state) (curPlayer state)
-    -- playWithAI
   else do
-    nextBoard <- liftIO . humanPlay $ curBoard
-    put $ GameState nextBoard (randomGen state) (nextPlayer state) (curPlayer state)
+    nextGameState <- liftIO . humanPlay $ curGameState
+    put $ SessionState nextGameState
+      (randomGen state) (nextPlayer state) (curPlayer state)
     playWithAI
 
 humanPlay :: HumanPlayer
-humanPlay board = do
+humanPlay state = do
   putStrLn $ moveHelp
   moveOrder <- readMoveOrder
-  return $ makeMove moveOrder board
+  return $ makeMove moveOrder state

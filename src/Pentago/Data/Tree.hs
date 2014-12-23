@@ -1,4 +1,7 @@
-module Pentago.Data.Tree where
+module Pentago.Data.Tree(
+  EdgeTree(..),
+  LeafValueTree(..),
+  toLeafValueTree) where
 
 import Control.Applicative
 import Data.Foldable

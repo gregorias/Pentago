@@ -1,4 +1,9 @@
-module Pentago.AI.Pentago where
+module Pentago.AI.Pentago(
+  Player,
+  HumanPlayer,
+  RandomAIPlayer,
+  aiPlay
+) where
 
 import Pentago.AI.MinMax
 import Pentago.Data.Matrix
@@ -17,22 +22,21 @@ import Data.Traversable
 import System.Random
 import qualified Data.Set
 
-type PentagoGameTree = EdgeTree MoveOrder Board
+type PentagoGameTree = EdgeTree MoveOrder GameState
 
-generatePentagoGameTree :: Board -> PentagoGameTree
-generatePentagoGameTree board
-  | isFinished board = ValueNode board []
-  | otherwise = ValueNode board (map (fmap generatePentagoGameTree)
-    uniqueChildBoardsWithMoves)
+generatePentagoGameTree :: GameState -> PentagoGameTree
+generatePentagoGameTree state
+  | isFinished state = ValueNode state []
+  | otherwise = ValueNode state (map (fmap generatePentagoGameTree)
+    uniqueChildStatesWithMoves)
   where 
-    possibleMoveOrders = generatePossibleMoveOrders board
-    getBoard = fst
-    childBoardsWithMoves = map
-      (\moveOrder -> (moveOrder, makeMove moveOrder board))
+    possibleMoveOrders = generatePossibleMoveOrders state
+    childStatesWithMoves = map
+      (\moveOrder -> (moveOrder, makeMove moveOrder state))
       possibleMoveOrders
-    uniqueChildBoardsWithMoves = nubBy ((==) `on` snd)
+    uniqueChildStatesWithMoves = nubBy ((==) `on` snd)
       . sortBy (compare `on` snd)
-      $ childBoardsWithMoves
+      $ childStatesWithMoves
 
 sizeOfGameTree :: PentagoGameTree -> Int
 sizeOfGameTree = Data.Foldable.foldl' (+) 0 . fmap (const 1)
@@ -55,29 +59,29 @@ type Score = BoundedFloat
 
 type PentagoEvaluationTree = LeafValueTree MoveOrder Score
 
-evaluateTree :: (Applicative f) => (Board -> f Score)
+evaluateTree :: (Applicative f) => (GameState -> f Score)
   -> PentagoGameTree
   -> f PentagoEvaluationTree
 evaluateTree evaluateF gameTree = traverse evaluateF leafTree
   where
     leafTree = toLeafValueTree gameTree
 
-type BoardEvaluation f = Board -> f Score
+type GameStateEvaluation f = GameState -> f Score
 
-trivialEvaluate :: (Applicative f) => BoardEvaluation f
-trivialEvaluate board = case getResult board of
+trivialEvaluate :: (Applicative f) => GameStateEvaluation f
+trivialEvaluate state = case getResult state of
   Nothing -> pure $ fromFloat 0.0
   Just Draw -> pure $ fromFloat (0.0)
   Just WhiteWin -> pure $ fromFloat 1.0
   Just BlackWin -> pure $ fromFloat (-1.0)
 
-blackEvaluate :: (Applicative f) => BoardEvaluation f
-blackEvaluate board = pure $ fromFloat (-1.0)
+blackEvaluate :: (Applicative f) => GameStateEvaluation f
+blackEvaluate state = pure $ fromFloat (-1.0)
 
-randomPlayEvaluate :: (RandomGen g) => BoardEvaluation (State g)
-randomPlayEvaluate board = do
+randomPlayEvaluate :: (RandomGen g) => GameStateEvaluation (State g)
+randomPlayEvaluate state = do
   let gameCount = 10
-  plays <- Control.Monad.State.forM [1..gameCount] (\_ -> randomPlay board)
+  plays <- Control.Monad.State.forM [1..gameCount] (\_ -> randomPlay state)
   let (whiteWins, blackWins) = Data.List.foldl'
        (\acc (_, result) -> case result of
          WhiteWin -> swap ((+ 1) <$>  swap acc)
@@ -95,36 +99,38 @@ randomElement list = do
   put newGen
   return $ list !! idx
 
-randomPlay :: (RandomGen g) => Board -> State g (Board, Result)
-randomPlay board = case getResult board of
+randomPlay :: (RandomGen g) => GameState -> State g (GameState, Result)
+randomPlay state = case getResult state of
   Nothing -> do
-    let possibleMoveOrders = generatePossibleMoveOrders board
+    let possibleMoveOrders = generatePossibleMoveOrders state
     moveOrder <- randomElement possibleMoveOrders
-    randomPlay $ makeMove moveOrder board
-  Just result -> return (board, result)
+    randomPlay $ makeMove moveOrder state
+  Just result -> return (state, result)
 
-type Player m = Board -> m Board
+type Player m = GameState -> m GameState
 
 type HumanPlayer = Pentago.AI.Pentago.Player IO
 
 type RandomAIPlayer g = Pentago.AI.Pentago.Player (State g)
 
-aiEvaluate :: (RandomGen g) => Int -> Board -> State g PentagoEvaluationTree
-aiEvaluate depth board = evaluateTree randomPlayEvaluate
+aiEvaluate :: (RandomGen g) => Int
+  -> GameState
+  -> State g PentagoEvaluationTree
+aiEvaluate depth state = evaluateTree randomPlayEvaluate
   . prune depth
-  . generatePentagoGameTree $ board
+  . generatePentagoGameTree $ state
 
 aiPlay :: (RandomGen g) => RandomAIPlayer g
-aiPlay board = 
-  let possibleMovesCount = length $ generatePossiblePlacementOrders board
+aiPlay state = 
+  let possibleMovesCount = length $ generatePossiblePlacementOrders state
       depth = if possibleMovesCount > 15
               then 1
               else if possibleMovesCount > 5
               then 2
               else 3
-      minMaxFunction = if fromJust (whoseTurn board) == BlackPlayer
+      minMaxFunction = if fromJust (whoseTurn state) == BlackPlayer
                        then minimize
                        else maximize
   in  do
-    (v, maybeMove) <- minMaxFunction <$> aiEvaluate depth board
-    return $ makeMove (fromJust maybeMove) board
+    (v, maybeMove) <- minMaxFunction <$> aiEvaluate depth state
+    return $ makeMove (fromJust maybeMove) state
