@@ -55,7 +55,6 @@ rotate270Symmetry (cX, cY, True) (x, y) =
 
 -- |Group symmetry operations on square matrix
 type MatrixSymmetry a i e = a (i, i) e -> a (i,i) e
--- TODO Rank2Types
 
 matrixSymmetry :: (Ix i, Integral i, IArray a e)
   => Symmetry i -> MatrixSymmetry a i e
