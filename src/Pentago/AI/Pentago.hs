@@ -28,27 +28,27 @@ import Data.Traversable
 import System.Random
 import qualified Data.Set
 
-type PentagoGameTree = EdgeTree MoveOrder GameState
+type PentagoGameTree s = EdgeTree MoveOrder s
 
 -- | Generate complete game tree from current state to all possible states
-generatePentagoGameTree :: GameState -> PentagoGameTree
+generatePentagoGameTree :: (GameState s) => s -> PentagoGameTree s
 generatePentagoGameTree state
   | isFinished state = ValueNode state []
   | otherwise = ValueNode state (map (fmap generatePentagoGameTree)
     uniqueChildStatesWithMoves)
   where 
-    possibleMoveOrders = generatePossibleMoveOrders state
+    possibleMoveOrders = getPossibleMoveOrders state
     childStatesWithMoves = map
       (\moveOrder -> (moveOrder, makeMove moveOrder state))
       possibleMoveOrders
-    uniqueChildStatesWithMoves = nubBy ((==) `on` snd)
-      . sortBy (compare `on` snd)
+    uniqueChildStatesWithMoves = nubBy ((==) `on` (getBoardArray . snd))
+      . sortBy (compare `on` (getBoardArray . snd))
       $ childStatesWithMoves
 
-sizeOfGameTree :: PentagoGameTree -> Int
+sizeOfGameTree :: PentagoGameTree s -> Int
 sizeOfGameTree = Data.Foldable.foldl' (+) 0 . fmap (const 1)
 
-prune :: Int -> PentagoGameTree -> PentagoGameTree
+prune :: Int -> PentagoGameTree s -> PentagoGameTree s
 prune 0 (ValueNode a xs) = ValueNode a []
 prune d (ValueNode a xs) = ValueNode a $ map (fmap $ prune (d - 1)) xs
 
@@ -66,26 +66,27 @@ type Score = BoundedFloat
 
 type PentagoEvaluationTree = LeafValueTree MoveOrder Score
 
-evaluateTree :: (Applicative f) => (GameState -> f Score)
-  -> PentagoGameTree
+evaluateTree :: (GameState s, Applicative f) => (s -> f Score)
+  -> PentagoGameTree s
   -> f PentagoEvaluationTree
 evaluateTree evaluateF gameTree = traverse evaluateF leafTree
   where
     leafTree = toLeafValueTree gameTree
 
-type GameStateEvaluation f = GameState -> f Score
+type GameStateEvaluation s f = s -> f Score
 
-trivialEvaluate :: (Applicative f) => GameStateEvaluation f
+trivialEvaluate :: (GameState s, Applicative f) => GameStateEvaluation s f
 trivialEvaluate state = case getResult state of
   Nothing -> pure $ fromFloat 0.0
   Just Draw -> pure $ fromFloat (0.0)
   Just WhiteWin -> pure $ fromFloat 1.0
   Just BlackWin -> pure $ fromFloat (-1.0)
 
-blackEvaluate :: (Applicative f) => GameStateEvaluation f
+blackEvaluate :: (GameState s, Applicative f) => GameStateEvaluation s f
 blackEvaluate state = pure $ fromFloat (-1.0)
 
-randomPlayEvaluate :: (RandomGen g) => GameStateEvaluation (State g)
+randomPlayEvaluate :: (GameState s, RandomGen g)
+  => GameStateEvaluation s (State g)
 randomPlayEvaluate state = do
   let gameCount = 10
   plays <- Control.Monad.State.forM [1..gameCount] (\_ -> randomPlay state)
@@ -106,32 +107,34 @@ randomElement list = do
   put newGen
   return $ list !! idx
 
-randomPlay :: (RandomGen g) => GameState -> State g (GameState, Result)
+randomPlay :: (GameState s, RandomGen g)
+  => s
+  -> State g (s, Result)
 randomPlay state = case getResult state of
   Nothing -> do
-    let possibleMoveOrders = generatePossibleMoveOrders state
+    let possibleMoveOrders = getPossibleMoveOrders state
     moveOrder <- randomElement possibleMoveOrders
     randomPlay $ makeMove moveOrder state
   Just result -> return (state, result)
 
 -- | Pentago player is a function from current game state to monadic evaluation
 -- returning next game state
-type Player m = GameState -> m GameState
+type Player m s = s -> m s
 
-type HumanPlayer = Pentago.AI.Pentago.Player IO
+type HumanPlayer s = Pentago.AI.Pentago.Player IO s
 
-type AIPlayer g = Pentago.AI.Pentago.Player (State g)
+type AIPlayer s g = Pentago.AI.Pentago.Player (State g) s
 
-aiEvaluate :: (RandomGen g) => Int
-  -> GameState
+aiEvaluate :: (GameState s, RandomGen g) => Int
+  -> s
   -> State g PentagoEvaluationTree
 aiEvaluate depth state = evaluateTree randomPlayEvaluate
   . prune depth
   . generatePentagoGameTree $ state
 
-randomAIPlayer :: (RandomGen g) => AIPlayer g
+randomAIPlayer :: (GameState s, RandomGen g) => AIPlayer s g
 randomAIPlayer state = 
-  let possibleMovesCount = length $ generatePossiblePlacementOrders state
+  let possibleMovesCount = length $ getPossiblePlacementOrders state
       depth = if possibleMovesCount > 15
               then 1
               else if possibleMovesCount > 5

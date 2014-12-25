@@ -32,11 +32,19 @@ main = runStateT mainMenu
     (Player (aiPlayerWrapper AP.randomAIPlayer) "AI 0")
     (Player (aiPlayerWrapper AP.randomAIPlayer) "AI 1"))
 
+-- main = trialGame
+
+trialGame = runStateT runGame
+      $ SessionState initialSimpleGameState (mkStdGen 0)
+      (Player (aiPlayerWrapper AP.randomAIPlayer) "AI 0")
+      (Player (aiPlayerWrapper AP.randomAIPlayer) "AI 1")
+
 -- main menu
+type ChosenGameStateType = SimpleGameState
 
 data MainMenuState = MainMenuState {
-  firstPlayer :: Player,
-  secondPlayer :: Player
+  firstPlayer :: Player ChosenGameStateType,
+  secondPlayer :: Player ChosenGameStateType
 }
 
 mainMenuString =
@@ -56,7 +64,7 @@ mainMenu = do
     lift $ do
       stdGen <- newStdGen
       runStateT runGame
-        $ SessionState initialGameState stdGen curPlayer nextPlayer
+        $ SessionState initialSimpleGameState stdGen curPlayer nextPlayer
     mainMenu
   else if option == '2'
   then do
@@ -65,8 +73,9 @@ mainMenu = do
   else
     return ()
 
+
 -- configuration menu
-switchPlayer :: Player -> Player
+switchPlayer :: (GameState s) => Player s -> Player s
 switchPlayer player = 
   if playerName == "Human"
   then Player (aiPlayerWrapper AP.randomAIPlayer) ("AI " ++ idx)
@@ -116,23 +125,23 @@ configurationMenu = do
 
 -- runGame
 
-data Player = Player {
-  playerWrapper :: PlayerWrapper,
+data Player s = Player {
+  playerWrapper :: PlayerWrapper s,
   name :: String
 }
   
 data SessionState = SessionState {
-  gameState :: GameState,
+  gameState :: ChosenGameStateType,
   randomGen :: StdGen,
-  curPlayer :: Player,
-  nextPlayer :: Player
+  curPlayer :: Player ChosenGameStateType,
+  nextPlayer :: Player ChosenGameStateType
 }
 
 runGame :: StateT SessionState IO ()
 runGame = do
   sessionState <- get
   let curGameState = gameState sessionState
-  liftIO . putStr . prettyShowBoard . board $ curGameState
+  liftIO . putStr . prettyShowBoard . getBoardArray $ curGameState
   if isFinished curGameState
   then do
     liftIO . putStrLn
@@ -151,9 +160,9 @@ runGame = do
 
 type PlayerWrapperMonad = StateT StdGen IO
 
-type PlayerWrapper = AP.Player PlayerWrapperMonad
+type PlayerWrapper s = AP.Player PlayerWrapperMonad s
 
-aiPlayerWrapper :: AP.AIPlayer StdGen -> PlayerWrapper
+aiPlayerWrapper :: (GameState s) => AP.AIPlayer s StdGen -> PlayerWrapper s
 aiPlayerWrapper aiPlayer =
   \board -> do
     gen <- get
@@ -161,13 +170,13 @@ aiPlayerWrapper aiPlayer =
     put newGen
     return newState
 
-humanPlayer :: AP.HumanPlayer
+humanPlayer :: (GameState s) => AP.HumanPlayer s
 humanPlayer state = do
   putStrLn $ moveHelp
   moveOrder <- readMoveOrder
   return $ makeMove moveOrder state
 
-humanPlayerWrapper :: PlayerWrapper
+humanPlayerWrapper :: (GameState s) => PlayerWrapper s
 humanPlayerWrapper = lift . humanPlayer
 
 whichMinMax state =
