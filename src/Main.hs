@@ -15,7 +15,7 @@ import qualified Pentago.AI.Pentago as AP
 import Control.Applicative
 import Control.Monad.Identity
 import Control.Monad.State
-import Data.Array
+import Data.Array.Unboxed
 import Data.Char
 import Data.Ix
 import Data.List
@@ -27,12 +27,12 @@ import System.Random
 
 ----- Data.Pentago
     
-main = runStateT mainMenu
+{-main = runStateT mainMenu
   (MainMenuState 
     (Player (aiPlayerWrapper AP.randomAIPlayer) "AI 0")
-    (Player (aiPlayerWrapper AP.randomAIPlayer) "AI 1"))
+    (Player (aiPlayerWrapper AP.randomAIPlayer) "AI 1")) -}
 
--- main = trialGame
+main = trialGame
 
 trialGame = runStateT runGame
       $ SessionState initialSimpleGameState (mkStdGen 0)

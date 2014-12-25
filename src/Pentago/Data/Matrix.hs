@@ -11,7 +11,7 @@ module Pentago.Data.Matrix(
   subarray,
   insertSubarray) where
 
-import Data.Array
+import Data.Array.IArray
 import Data.Tuple
 
 -- Function type containing symmetry operations on array indexes.
@@ -48,34 +48,38 @@ rotate270Symmetry center = transposeSymmetry center . horizontalSymmetry center
 -- TODO quickcheck that transpose . transpose = id
 
 -- |Group symmetry operations on square matrix
-type MatrixSymmetry i e = Array (i, i) e -> Array (i,i) e
+type MatrixSymmetry a i e = a (i, i) e -> a (i,i) e
+-- TODO Rank2Types
 
-matrixSymmetry :: (Ix i, Integral i) => Symmetry i -> MatrixSymmetry i e
+matrixSymmetry :: (Ix i, Integral i, IArray a e)
+  => Symmetry i -> MatrixSymmetry a i e
 matrixSymmetry symmetry matrix = ixmap (bounds matrix) (symmetry center) matrix
   where 
     ((begX, begY), (endX, endY)) = bounds matrix
     center = (div (begX + endX) 2, div (begY + endY) 2, even $ endY - begY + 1)
 
 -- |Perform OY symmetry on a matrix
-horizontalMatrixSymmetry :: (Ix i, Integral i) => MatrixSymmetry i e
+horizontalMatrixSymmetry :: (Ix i, Integral i, IArray a e)
+  => MatrixSymmetry a i e
 horizontalMatrixSymmetry = matrixSymmetry horizontalSymmetry
 
 -- |Perform OX symmetry on a matrix
-verticalMatrixSymmetry :: (Ix i, Integral i) => MatrixSymmetry i e
+verticalMatrixSymmetry :: (Ix i, Integral i, IArray a e)
+  => MatrixSymmetry a i e
 verticalMatrixSymmetry = matrixSymmetry verticalSymmetry
 
 -- |Perform left rotation on a matrix
-rotate90Matrix :: (Ix i, Integral i) => MatrixSymmetry i e
+rotate90Matrix :: (Ix i, Integral i, IArray a e) => MatrixSymmetry a i e
 rotate90Matrix = matrixSymmetry rotate270Symmetry
 
 -- |Perform right rotation on a matrix
-rotate270Matrix :: (Ix i, Integral i) => MatrixSymmetry i e
+rotate270Matrix :: (Ix i, Integral i, IArray a e) => MatrixSymmetry a i e
 rotate270Matrix = matrixSymmetry rotate90Symmetry
 
 -- |Get subarray bounded by indexes
-subarray :: (Ix i) => (i, i) -> Array i e -> Array i e
+subarray :: (Ix i, IArray a e) => (i, i) -> a i e -> a i e
 subarray = \newBounds -> ixmap newBounds id
 
 -- |Insert subarray into array
-insertSubarray :: (Ix i) => Array i e -> Array i e -> Array i e
+insertSubarray :: (Ix i, IArray a e) => a i e -> a i e -> a i e
 insertSubarray subarray mainArray = mainArray // (assocs subarray)
