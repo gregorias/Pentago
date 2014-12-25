@@ -22,8 +22,6 @@ module Pentago.Data.Pentago(
   isFinished,
   getPossibleMoveOrders,
   prettyShowBoard
-  , get5RLAcross
-  , get5LRAcross
   ) where
 
 import Pentago.Data.Matrix
@@ -144,58 +142,61 @@ hasBoardRowSameElements board =
     hasTheCenterSameElements = and $ map
       (\idx -> second == board ! idx) [2..4]
 
-getTheListSameNonEmptyPositions :: [Position] -> Maybe Position
-getTheListSameNonEmptyPositions [] = Nothing
-getTheListSameNonEmptyPositions xs = 
-  if all id $ map ((&&) <$> (== (head xs)) <*> (/= Empty)) (tail xs)
+getTheListSamePositions :: (Eq a) => a -> [a] -> Maybe a
+getTheListSamePositions _ [] = Nothing
+getTheListSamePositions except xs = 
+  if all id $ map ((&&) <$> (== (head xs)) <*> (/= except)) (tail xs)
   then Just $ head xs
   else Nothing
 
-getTheList5SameNonEmptyPositions :: [Position] -> Maybe Position
-getTheList5SameNonEmptyPositions [] = Nothing
-getTheList5SameNonEmptyPositions (x:xs) =
+getTheList5SamePositions :: (Eq a) => a -> [a] -> Maybe a
+getTheList5SamePositions _ [] = Nothing
+getTheList5SamePositions except (x:xs) =
   if length first5 < 5
   then Nothing
-  else getTheListSameNonEmptyPositions first5
-    `mplus` getTheList5SameNonEmptyPositions xs
+  else getTheListSamePositions except first5
+    `mplus` getTheList5SamePositions except xs
   where first5 = take 5 (x:xs)
 
-get5InARow :: BoardArray -> Maybe Position
-get5InARow board = foldl' mplus Nothing $ map get5InARow'
+get5InARow :: (Eq e, IArray a e) => e -> a (Int, Int) e -> Maybe e
+get5InARow except board = foldl' mplus Nothing
+  $ map (get5InARow' except)
   $ map (\i -> subarray ((0, i), (5, i)) board) [0..5]
 
-betterget5InARow :: BoardArray -> Maybe Position
-betterget5InARow board = foldl' mplus Nothing $ map betterget5InARow'
+betterGet5InARow :: (Eq e, IArray a e) => e -> a (Int, Int) e -> Maybe e
+betterGet5InARow except board = foldl' mplus Nothing 
+  $ map (betterGet5InARow' except)
   $ map (\y -> (ixmap (0, 5) (\x -> (x, y)) board))  [0..5]
 
-betterget5InARow' row = do
-  elem <- hasBoardRowSameElements row
-  if elem /= Empty
+get5InAColumn :: (Eq e, IArray a e) => e -> a (Int, Int) e -> Maybe e
+get5InAColumn except board = foldl' mplus Nothing $ map (get5InARow' except)
+  $ map (\i -> subarray ((i, 0), (i, 5)) board) [0..5]
+
+betterGet5InAColumn :: (Eq e, IArray a e) => e -> a (Int, Int) e -> Maybe e
+betterGet5InAColumn except board = foldl' mplus Nothing
+  $ map (betterGet5InARow' except)
+  $ map (\x -> (ixmap (0, 5) (\y -> (x, y)) board)) [0..5]
+
+get5InARow' except row = do
+  elem <- get5RepeatingElementsFrom6ElementList (rowToList row)
+  if elem /= except
   then return elem
   else fail "Found only empty element"
 
-get5InAColumn :: BoardArray -> Maybe Position
-get5InAColumn board = foldl' mplus Nothing $ map get5InARow'
-  $ map (\i -> subarray ((i, 0), (i, 5)) board) [0..5]
-
-betterget5InAColumn :: BoardArray -> Maybe Position
-betterget5InAColumn board = foldl' mplus Nothing $ map betterget5InARow'
-  $ map (\x -> (ixmap (0, 5) (\y -> (x, y)) board)) [0..5]
-
-get5InARow' row = do
-  elem <- get5RepeatingElementsFrom6ElementList $ rowToList row
-  if elem /= Empty
+betterGet5InARow' except row = do
+  elem <- hasBoardRowSameElements row
+  if elem /= except
   then return elem
   else fail "Found only empty element"
 
 get5LRAcross board = foldl' mplus Nothing $
-  map (getTheList5SameNonEmptyPositions . rowToList) [rowA, rowB, rowC]
+  map (getTheList5SamePositions Empty . rowToList) [rowA, rowB, rowC]
   where rowA = ixmap (0, 5) (\i -> (i, i)) board
         rowB = ixmap (0, 4) (\i -> (i + 1, i)) board
         rowC = ixmap (0, 4) (\i -> (i, i + 1)) board
 
 get5RLAcross board = foldl' mplus Nothing $
-  map (getTheList5SameNonEmptyPositions . rowToList) [rowA, rowB, rowC]
+  map (getTheList5SamePositions Empty . rowToList) [rowA, rowB, rowC]
   where rowA = ixmap (0, 5) (\i -> (5 - i, i)) board
         rowC = ixmap (0, 4) (\i -> (4 - i, i)) board
         rowB = ixmap (0, 4) (\i -> (5 - i,  i + 1)) board
@@ -213,8 +214,9 @@ instance GameState SimpleGameState where
   getPossiblePlacementOrders = findArrayElements Empty . getBoardArray
 
   getResult state = mplus 
-    (fmap positionToResult (foldl' mplus Nothing [betterget5InARow curBoard,
-      betterget5InAColumn curBoard,
+    (fmap positionToResult (foldl' mplus Nothing [
+      betterGet5InARow Empty curBoard,
+      betterGet5InAColumn Empty curBoard,
       get5LRAcross curBoard,
       get5RLAcross curBoard]))
     (if length (getPossiblePlacementOrders state) == 0
@@ -285,13 +287,13 @@ data UnboxedGameState = UnboxedGameState {
   unboxedBoardArray :: UnboxedBoardArray
 } deriving (Eq, Ord, Show)
 
-{- instance GameState UnboxedGameState where
+instance GameState UnboxedGameState where
   getBoardArray = unboxedToBoxedBoardArray . unboxedBoardArray
 
   getPossiblePlacementOrders =
-    findArrayElements (positionToChar Empty) . getBoardArray
+    findArrayElements (positionToChar Empty) . unboxedBoardArray
 
-  getResult state = mplus 
+  getResult state = undefined {-mplus 
     (fmap positionToResult (foldl' mplus Nothing [get5InARow curBoard,
       get5InARow (rotate90Matrix curBoard),
       get5Across curBoard,
@@ -300,16 +302,15 @@ data UnboxedGameState = UnboxedGameState {
      then Just Draw
      else Nothing)
     where
-      curBoard = unboxedBoardArray state
+      curBoard = unboxedBoardArray state -}
 
-  makeMove (pos, rot) = rotateBoard rot . placeToken pos
+  makeMove (pos, rot) = undefined --rotateBoard rot . placeToken pos
 
   whoseTurn state | count (positionToChar Empty) curBoard == 0 = Nothing
                   | count (positionToChar White) curBoard
                     == count (positionToChar Black) curBoard = Just WhitePlayer
                   | otherwise = Just BlackPlayer
                   where curBoard = unboxedBoardArray state
-                  -}
 
 -- Board printing
 
