@@ -39,11 +39,17 @@ rotate180Symmetry center = horizontalSymmetry center . verticalSymmetry center
 
 -- r
 rotate90Symmetry :: (Integral i) => Symmetry i
-rotate90Symmetry center = horizontalSymmetry center . transposeSymmetry center
+rotate90Symmetry (cX, cY, False) (x, y) = (cX + (y - cY),
+  cY - (x - cX))
+rotate90Symmetry (cX, cY, True) (x, y) = (cX + (y - cY),
+  cY - (x - cX) + 1)
 
 -- r^3
 rotate270Symmetry :: (Integral i) => Symmetry i
-rotate270Symmetry center = transposeSymmetry center . horizontalSymmetry center
+rotate270Symmetry (cX, cY, False) (x, y) =
+  (cX - (y - cY), cY + (x - cX))
+rotate270Symmetry (cX, cY, True) (x, y) =
+  (cX - (y - cY) + 1, cY + (x - cX))
 
 -- TODO quickcheck that transpose . transpose = id
 
