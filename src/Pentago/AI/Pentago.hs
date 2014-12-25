@@ -5,10 +5,11 @@ Description : Implementation of Pentago AI
 Implementation of Pentago AI
 -}
 module Pentago.AI.Pentago(
-  Player,
-  HumanPlayer,
-  AIPlayer,
-  randomAIPlayer
+  Player
+  , HumanPlayer
+  , AIPlayer
+  , randomAIPlayer
+  , trivialAIPlayer
 ) where
 
 import Pentago.AI.MinMax
@@ -35,15 +36,15 @@ generatePentagoGameTree :: (GameState s) => s -> PentagoGameTree s
 generatePentagoGameTree state
   | isFinished state = ValueNode state []
   | otherwise = ValueNode state (map (fmap generatePentagoGameTree)
-    uniqueChildStatesWithMoves)
+    childStatesWithMoves)
   where 
     possibleMoveOrders = getPossibleMoveOrders state
     childStatesWithMoves = map
       (\moveOrder -> (moveOrder, makeMove moveOrder state))
       possibleMoveOrders
-    uniqueChildStatesWithMoves = nubBy ((==) `on` (getBoardArray . snd))
-      . sortBy (compare `on` (getBoardArray . snd))
-      $ childStatesWithMoves
+    {-uniqueChildStatesWithMoves = nubBy ((==) `on` (getBoardArray . snd))
+       . sortBy (compare `on` (getBoardArray . snd))
+       $ childStatesWithMoves -}
 
 sizeOfGameTree :: PentagoGameTree s -> Int
 sizeOfGameTree = Data.Foldable.foldl' (+) 0 . fmap (const 1)
@@ -125,10 +126,13 @@ type HumanPlayer s = Pentago.AI.Pentago.Player IO s
 
 type AIPlayer s g = Pentago.AI.Pentago.Player (State g) s
 
-aiEvaluate :: (GameState s, RandomGen g) => Int
+aiEvaluate :: (GameState s, RandomGen g)
+  => GameStateEvaluation s (State g)
+  -> Int
   -> s
   -> State g PentagoEvaluationTree
-aiEvaluate depth state = evaluateTree randomPlayEvaluate
+aiEvaluate stateEvaluation depth state =
+  evaluateTree stateEvaluation
   . prune depth
   . generatePentagoGameTree $ state
 
@@ -144,5 +148,22 @@ randomAIPlayer state =
                        then minimize
                        else maximize
   in  do
-    (v, maybeMove) <- minMaxFunction <$> aiEvaluate depth state
+    (v, maybeMove) <- minMaxFunction
+      <$> (aiEvaluate randomPlayEvaluate) depth state
+    return $ makeMove (fromJust maybeMove) state
+
+trivialAIPlayer :: (GameState s, RandomGen g) => AIPlayer s g
+trivialAIPlayer state = 
+  let possibleMovesCount = length $ getPossiblePlacementOrders state
+      depth = if possibleMovesCount > 15
+              then 2
+              else if possibleMovesCount > 5
+              then 3
+              else 4
+      minMaxFunction = if fromJust (whoseTurn state) == BlackPlayer
+                       then minimize
+                       else maximize
+  in  do
+    (v, maybeMove) <- minMaxFunction
+      <$> (aiEvaluate trivialEvaluate) depth state
     return $ makeMove (fromJust maybeMove) state

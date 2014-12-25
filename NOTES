@@ -5,6 +5,7 @@ readability
 (increases reuse)
 -- How fmap . fmap . fmap can be seen as lifting
 -- bounding symmetry does not help
+-- How eliminating sort on board speed things up (rotation is the power)
 
 -- Traversable -- Why is applicative concatenated and not monad?
 -- Monads have: >>=, join, return and >>

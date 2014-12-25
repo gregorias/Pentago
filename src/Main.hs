@@ -25,6 +25,56 @@ import Text.ParserCombinators.Parsec
 import Text.Parsec.Char
 import System.Random
 
+faultyGame = 
+  makeMove ((5,1), (LeftTop, RightRotation))
+  . makeMove ((5,2), (RightBottom, LeftRotation))
+  . makeMove ((5,0), (RightBottom, RightRotation))
+  . makeMove ((4,2), (RightBottom, LeftRotation))
+  . makeMove ((4,0), (RightBottom, RightRotation))
+  . makeMove ((5,3), (RightTop, LeftRotation))
+  . makeMove ((4,1), (RightTop, RightRotation))
+  . makeMove ((5,4), (RightTop, LeftRotation))
+  . makeMove ((3,2), (RightTop, RightRotation))
+  . makeMove ((5,5), (RightTop, RightRotation))
+  . makeMove ((2,5), (RightTop, RightRotation))
+  . makeMove ((4,5), (RightTop, RightRotation))
+  . makeMove ((2,4), (RightTop, RightRotation))
+  . makeMove ((3,5), (RightTop, RightRotation))
+  . makeMove ((1,4), (RightTop, RightRotation))
+  . makeMove ((2,3), (RightTop, RightRotation))
+  . makeMove ((1,3), (RightTop, RightRotation))
+  . makeMove ((2,2), (RightTop, RightRotation))
+  . makeMove ((2,1), (RightTop, RightRotation))
+  . makeMove ((1,1), (RightTop, RightRotation))
+  $ initialUnboxedGameState
+{-------------------------
+| . | . | . | . | x | x |
+-------------------------
+| . | o | . | . | x | x |
+-------------------------
+| o | x | . | x | o | o |
+-------------------------
+| . | x | o | . | . | o |
+-------------------------
+| . | x | x | . | . | o |
+-------------------------
+| . | . | x | o | o | o |
+-------------------------}
+--
+{-------------------------
+| . | . | . | x | . | . |
+-------------------------
+| . | o | . | o | x | x |
+-------------------------
+| o | x | . | o | x | x |
+-------------------------
+| . | x | o | o | . | o |
+-------------------------
+| . | x | x | . | . | o |
+-------------------------
+| . | . | x | o | o | o |
+-------------------------}
+
 ----- Data.Pentago
     
 {- main = runStateT mainMenu
@@ -143,9 +193,15 @@ runGame = do
   let curGameState = gameState sessionState
   liftIO . putStr . prettyShowBoard . getBoardArray $ curGameState
   if isFinished curGameState
-  then do
-    liftIO . putStrLn
-      $ (show . name $ nextPlayer sessionState) ++ " has won!"
+  then 
+    let
+      result = getResult curGameState
+      winMessage = case result of
+        Just Draw -> "The game has ended in a draw."
+        Just WhiteWin -> "The white player has won."
+        Just BlackWin -> "The black player has won."
+    in do
+      liftIO . putStrLn $ winMessage
   else do
     let curPlayerWrapper = playerWrapper . curPlayer $ sessionState
     (newGameState, newPlayerState) <- liftIO

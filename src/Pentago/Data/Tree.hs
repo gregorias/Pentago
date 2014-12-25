@@ -21,7 +21,6 @@ data EdgeTree e v = ValueNode v [(e, EdgeTree e v)]
 -- |Tree with values only in leaves
 data LeafValueTree e v = Node [(e, LeafValueTree e v)] |
                          Leaf v
-  deriving (Show) 
 
 instance Functor (EdgeTree e) where
   fmap f (ValueNode v xs) = ValueNode (f v) ((fmap . fmap . fmap $ f) xs)
@@ -44,6 +43,22 @@ instance Traversable (LeafValueTree e) where
     where 
       efTList = map (fmap sequenceA) xs -- [(e, f T e v)]
       fList = map (\(e, fT) -> (\t -> (e, t)) <$> fT) efTList -- f [(e, T e v)]
+
+instance (Show e, Show v) => Show (LeafValueTree e v) where
+  show = showWithPrefix ""
+    where
+      showWithPrefix :: (Show e, Show v) => String -> LeafValueTree e v -> String
+      showWithPrefix prefix (Leaf v) = prefix ++ show v ++ "\n"
+      showWithPrefix prefix (Node xs) = 
+        Prelude.foldr
+          (\(e, subtree) a ->
+            (edgeString e) ++ showWithPrefix newPrefix subtree ++ a)
+          ""
+          xs
+        where
+          newPrefix = prefix ++ "  "
+          edgeString e = prefix ++ show e ++ "\n"
+         
 
 -- |Transform EdgeTree to LeafValueTree tree discarding inner node values.
 toLeafValueTree :: EdgeTree e v -> LeafValueTree e v
