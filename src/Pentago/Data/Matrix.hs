@@ -6,8 +6,11 @@ Basic square matrix/array operations
 -}
 module Pentago.Data.Matrix(
   MatrixSymmetry,
+  BoundedMatrixSymmetry,
   rotate90Matrix,
   rotate270Matrix,
+  rotate90BoundedMatrix,
+  rotate270BoundedMatrix,
   subarray,
   insertSubarray) where
 
@@ -55,7 +58,7 @@ rotate270Symmetry (cX, cY, True) (x, y) =
 
 -- |Group symmetry operations on square matrix
 type MatrixSymmetry a i e = a (i, i) e -> a (i,i) e
--- TODO Rank2Types
+type BoundedMatrixSymmetry a i e = ((i, i), (i, i)) -> a (i, i) e -> a (i,i) e
 
 matrixSymmetry :: (Ix i, Integral i, IArray a e)
   => Symmetry i -> MatrixSymmetry a i e
@@ -63,6 +66,18 @@ matrixSymmetry symmetry matrix = ixmap (bounds matrix) (symmetry center) matrix
   where 
     ((begX, begY), (endX, endY)) = bounds matrix
     center = (div (begX + endX) 2, div (begY + endY) 2, even $ endY - begY + 1)
+
+boundedMatrixSymmetry :: (Ix i, Integral i, IArray a e)
+  => Symmetry i -> BoundedMatrixSymmetry a i e
+boundedMatrixSymmetry symmetry symmetryBounds matrix =
+  ixmap (bounds matrix) mySymmetry matrix
+  where 
+    ((begX, begY), (endX, endY)) = symmetryBounds
+    center = (div (begX + endX) 2, div (begY + endY) 2, odd $ endY - begY)
+    mySymmetry pos = 
+      if inRange symmetryBounds pos
+      then symmetry center pos
+      else pos
 
 -- |Perform OY symmetry on a matrix
 horizontalMatrixSymmetry :: (Ix i, Integral i, IArray a e)
@@ -81,6 +96,14 @@ rotate90Matrix = matrixSymmetry rotate270Symmetry
 -- |Perform right rotation on a matrix
 rotate270Matrix :: (Ix i, Integral i, IArray a e) => MatrixSymmetry a i e
 rotate270Matrix = matrixSymmetry rotate90Symmetry
+
+rotate90BoundedMatrix :: (Ix i, Integral i, IArray a e)
+  => BoundedMatrixSymmetry a i e
+rotate90BoundedMatrix = boundedMatrixSymmetry rotate270Symmetry
+
+rotate270BoundedMatrix :: (Ix i, Integral i, IArray a e) =>
+  BoundedMatrixSymmetry a i e
+rotate270BoundedMatrix = boundedMatrixSymmetry rotate90Symmetry
 
 -- |Get subarray bounded by indexes
 subarray :: (Ix i, IArray a e) => (i, i) -> a i e -> a i e

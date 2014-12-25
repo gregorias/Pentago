@@ -76,6 +76,11 @@ rotationDirectionToMatrixSymmetry :: (Ix i, Integral i, IArray a e) =>
 rotationDirectionToMatrixSymmetry LeftRotation = rotate90Matrix
 rotationDirectionToMatrixSymmetry RightRotation = rotate270Matrix
 
+rotationDirectionToBoundedMatrixSymmetry :: (Ix i, Integral i, IArray a e) =>
+  RotationDirection -> BoundedMatrixSymmetry a i e
+rotationDirectionToBoundedMatrixSymmetry LeftRotation = rotate90BoundedMatrix
+rotationDirectionToBoundedMatrixSymmetry RightRotation = rotate270BoundedMatrix
+
 allPlacementOrders = range ((0,0), (5,5))
 
 allRotationOrders = do
@@ -212,6 +217,13 @@ rotateQuadrant (quadrant, rotationDirection) board =
     newQuadrantMatrix =
       rotationDirectionToMatrixSymmetry rotationDirection quadrantMatrix
 
+rotateBoundedQuadrant :: (IArray a e) => RotationOrder 
+  -> a (Int, Int) e
+  -> a (Int, Int) e
+rotateBoundedQuadrant (quadrant, rotationDirection) =
+  rotationDirectionToBoundedMatrixSymmetry rotationDirection
+    (quadrantToBounds quadrant)
+
 placeToken :: (Ix i, IArray a e) => i -> e -> a i e -> a i e
 placeToken pos elem board = board // [(pos, elem)]
 
@@ -268,8 +280,6 @@ positionToResult White = WhiteWin
 positionToResult Black = BlackWin
 
 -- UnboxedGameState
---
--- | GameState which uses unboxed array as board representation
 
 type UnboxedBoardArray = UArray (Int, Int) Char
 
@@ -288,6 +298,7 @@ unboxedToBoxedBoardArray unboxed = array
   where
     arrayBounds = bounds unboxed
 
+-- | GameState which uses unboxed array as board representation
 data UnboxedGameState = UnboxedGameState {
   unboxedBoardArray :: UnboxedBoardArray
 } deriving (Eq, Ord, Show)

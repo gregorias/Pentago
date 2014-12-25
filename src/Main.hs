@@ -27,7 +27,7 @@ import System.Random
 
 ----- Data.Pentago
     
-{-main = runStateT mainMenu
+{- main = runStateT mainMenu
   (MainMenuState 
     (Player (aiPlayerWrapper AP.randomAIPlayer) "AI 0")
     (Player (aiPlayerWrapper AP.randomAIPlayer) "AI 1")) -}

@@ -4,6 +4,7 @@ readability
 -- How game tree is traversable and that requires to generalise the type
 (increases reuse)
 -- How fmap . fmap . fmap can be seen as lifting
+-- bounding symmetry does not help
 
 -- Traversable -- Why is applicative concatenated and not monad?
 -- Monads have: >>=, join, return and >>
