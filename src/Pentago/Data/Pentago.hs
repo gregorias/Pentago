@@ -16,6 +16,8 @@ module Pentago.Data.Pentago(
   GameState(..),
   SimpleGameState,
   initialSimpleGameState,
+  UnboxedGameState,
+  initialUnboxedGameState,
   allPlacementOrders,
   allRotationOrders,
   allMoveOrders,
@@ -189,17 +191,29 @@ betterGet5InARow' except row = do
   then return elem
   else fail "Found only empty element"
 
-get5LRAcross board = foldl' mplus Nothing $
-  map (getTheList5SamePositions Empty . rowToList) [rowA, rowB, rowC]
+get5LRAcross except board = foldl' mplus Nothing $
+  map (getTheList5SamePositions except . rowToList) [rowA, rowB, rowC]
   where rowA = ixmap (0, 5) (\i -> (i, i)) board
         rowB = ixmap (0, 4) (\i -> (i + 1, i)) board
         rowC = ixmap (0, 4) (\i -> (i, i + 1)) board
 
-get5RLAcross board = foldl' mplus Nothing $
-  map (getTheList5SamePositions Empty . rowToList) [rowA, rowB, rowC]
+get5RLAcross except board = foldl' mplus Nothing $
+  map (getTheList5SamePositions except . rowToList) [rowA, rowB, rowC]
   where rowA = ixmap (0, 5) (\i -> (5 - i, i)) board
         rowC = ixmap (0, 4) (\i -> (4 - i, i)) board
         rowB = ixmap (0, 4) (\i -> (5 - i,  i + 1)) board
+
+rotateQuadrant :: (IArray a e) => RotationOrder 
+  -> a (Int, Int) e
+  -> a (Int, Int) e
+rotateQuadrant (quadrant, rotationDirection) board =
+  insertSubarray newQuadrantMatrix board where
+    quadrantMatrix = subarray (quadrantToBounds quadrant) board
+    newQuadrantMatrix =
+      rotationDirectionToMatrixSymmetry rotationDirection quadrantMatrix
+
+placeToken :: (Ix i, IArray a e) => i -> e -> a i e -> a i e
+placeToken pos elem board = board // [(pos, elem)]
 
 -- SimpleGameState
 
@@ -217,15 +231,24 @@ instance GameState SimpleGameState where
     (fmap positionToResult (foldl' mplus Nothing [
       betterGet5InARow Empty curBoard,
       betterGet5InAColumn Empty curBoard,
-      get5LRAcross curBoard,
-      get5RLAcross curBoard]))
+      get5LRAcross Empty curBoard,
+      get5RLAcross Empty curBoard]))
     (if length (getPossiblePlacementOrders state) == 0
      then Just Draw
      else Nothing)
     where
       curBoard = simpleBoardArray state
 
-  makeMove (pos, rot) = rotateBoard rot . placeToken pos
+  makeMove (pos, rot) state =
+    if curBoard ! pos == Empty
+    then SimpleGameState $ rotateQuadrant rot . placeToken pos token $ curBoard
+    else undefined
+    where 
+      currentTurn = whoseTurn state
+      curBoard = simpleBoardArray state
+      token = case currentTurn of
+                Just WhitePlayer -> White
+                Just BlackPlayer -> Black
 
   whoseTurn state | count Empty curBoard == 0 = Nothing
                   | count White curBoard == count Black curBoard
@@ -233,34 +256,16 @@ instance GameState SimpleGameState where
                   | otherwise = Just BlackPlayer
                   where curBoard = getBoardArray state
 
-emptyBoard :: BoardArray
-emptyBoard = array bounds [(i, Empty) | i <- range bounds]
+emptyBoard :: (IArray a e) => e -> a (Int, Int) e
+emptyBoard emptyValue = array bounds [(i, emptyValue) | i <- range bounds]
   where
     bounds = ((0,0), (5, 5))
 
-initialSimpleGameState = SimpleGameState emptyBoard
+initialSimpleGameState = SimpleGameState (emptyBoard Empty)
 
 positionToResult Empty = undefined
 positionToResult White = WhiteWin
 positionToResult Black = BlackWin
-
-rotateBoard :: RotationOrder -> SimpleGameState -> SimpleGameState
-rotateBoard (quadrant, rotationDirection) state =
-  SimpleGameState $ insertSubarray newQuadrantMatrix curBoard where
-    curBoard = simpleBoardArray state
-    quadrantMatrix = subarray (quadrantToBounds quadrant) curBoard
-    newQuadrantMatrix =
-      rotationDirectionToMatrixSymmetry rotationDirection quadrantMatrix
-
-placeToken :: (Int, Int) -> SimpleGameState -> SimpleGameState
-placeToken pos state
-  | (curBoard ! pos == Empty) = SimpleGameState $ curBoard // [(pos, turn)]
-  | otherwise = undefined
-  where
-    curBoard = simpleBoardArray state
-    turn = if count White curBoard > count Black curBoard
-           then Black
-           else White
 
 -- UnboxedGameState
 --
@@ -293,24 +298,39 @@ instance GameState UnboxedGameState where
   getPossiblePlacementOrders =
     findArrayElements (positionToChar Empty) . unboxedBoardArray
 
-  getResult state = undefined {-mplus 
-    (fmap positionToResult (foldl' mplus Nothing [get5InARow curBoard,
-      get5InARow (rotate90Matrix curBoard),
-      get5Across curBoard,
-      get5Across (rotate90Matrix curBoard)]))
+  getResult state = mplus
+    (fmap (positionToResult . charToPosition) (foldl' mplus Nothing [
+      betterGet5InARow emptyChar curBoard,
+      betterGet5InAColumn emptyChar curBoard,
+      get5LRAcross emptyChar curBoard,
+      get5RLAcross emptyChar curBoard]))
     (if length (getPossiblePlacementOrders state) == 0
      then Just Draw
      else Nothing)
     where
-      curBoard = unboxedBoardArray state -}
+      curBoard = unboxedBoardArray state
+      emptyChar = positionToChar Empty
 
-  makeMove (pos, rot) = undefined --rotateBoard rot . placeToken pos
+  makeMove (pos, rot) state =
+    if curBoard ! pos == positionToChar Empty
+    then UnboxedGameState
+      $ rotateQuadrant rot . placeToken pos token
+      $ curBoard
+    else undefined
+    where 
+      currentTurn = whoseTurn state
+      curBoard = unboxedBoardArray state
+      token = case currentTurn of
+                Just WhitePlayer -> (positionToChar White)
+                Just BlackPlayer -> (positionToChar Black)
 
   whoseTurn state | count (positionToChar Empty) curBoard == 0 = Nothing
                   | count (positionToChar White) curBoard
                     == count (positionToChar Black) curBoard = Just WhitePlayer
                   | otherwise = Just BlackPlayer
                   where curBoard = unboxedBoardArray state
+
+initialUnboxedGameState = UnboxedGameState (emptyBoard . positionToChar $ Empty)
 
 -- Board printing
 

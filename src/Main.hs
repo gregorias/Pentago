@@ -35,12 +35,12 @@ import System.Random
 main = trialGame
 
 trialGame = runStateT runGame
-      $ SessionState initialSimpleGameState (mkStdGen 0)
+      $ SessionState initialUnboxedGameState (mkStdGen 0)
       (Player (aiPlayerWrapper AP.randomAIPlayer) "AI 0")
       (Player (aiPlayerWrapper AP.randomAIPlayer) "AI 1")
 
 -- main menu
-type ChosenGameStateType = SimpleGameState
+type ChosenGameStateType = UnboxedGameState
 
 data MainMenuState = MainMenuState {
   firstPlayer :: Player ChosenGameStateType,
@@ -64,7 +64,7 @@ mainMenu = do
     lift $ do
       stdGen <- newStdGen
       runStateT runGame
-        $ SessionState initialSimpleGameState stdGen curPlayer nextPlayer
+        $ SessionState initialUnboxedGameState stdGen curPlayer nextPlayer
     mainMenu
   else if option == '2'
   then do
