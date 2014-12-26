@@ -5,6 +5,10 @@ Description :  Basic square matrix/array operations
 Basic square matrix/array operations
 -}
 module Pentago.Data.Matrix(
+  Symmetry,
+  rotate90Symmetry,
+  rotate270Symmetry,
+  boundSymmetry,
   MatrixSymmetry,
   BoundedMatrixSymmetry,
   rotate90Matrix,
@@ -17,10 +21,10 @@ module Pentago.Data.Matrix(
 import Data.Array.IArray
 import Data.Tuple
 
--- Function type containing symmetry operations on array indexes.
-type Symmetry i = (i, i, Bool) -- ^ YOLO
-                  -> (i, i) -- ^ASD
-                  -> (i, i) -- ^DS
+-- |Function type containing symmetry operations on array indexes.
+type Symmetry i = (i, i, Bool)
+                  -> (i, i)
+                  -> (i, i)
 
 -- s
 horizontalSymmetry :: (Integral i) => Symmetry i
@@ -53,6 +57,15 @@ rotate270Symmetry (cX, cY, False) (x, y) =
   (cX - (y - cY), cY + (x - cX))
 rotate270Symmetry (cX, cY, True) (x, y) =
   (cX - (y - cY) + 1, cY + (x - cX))
+
+boundSymmetry :: (Integral i, Ix i)
+  => ((i, i), (i, i))
+  -> Symmetry i 
+  -> Symmetry i
+boundSymmetry bounds symmetry = (\center pos ->
+  if inRange bounds pos
+  then symmetry center pos
+  else pos)
 
 -- TODO quickcheck that transpose . transpose = id
 

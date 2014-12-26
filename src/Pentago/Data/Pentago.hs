@@ -18,6 +18,8 @@ module Pentago.Data.Pentago(
   initialSimpleGameState,
   UnboxedGameState,
   initialUnboxedGameState,
+  SmartGameState,
+  initialSmartGameState,
   allPlacementOrders,
   allRotationOrders,
   allMoveOrders,
@@ -70,6 +72,17 @@ quadrantToBounds RightTop = ((3, 0), (5, 2))
 quadrantToBounds LeftTop = ((0, 0), (2, 2))
 quadrantToBounds LeftBottom = ((0, 3), (2, 5))
 quadrantToBounds RightBottom = ((3, 3), (5, 5))
+
+quadrantToCenter :: Quadrant -> (Int, Int, Bool)
+quadrantToCenter RightTop = (4, 1, False)
+quadrantToCenter LeftTop = (1, 1, False)
+quadrantToCenter LeftBottom = (1, 4, False)
+quadrantToCenter RightBottom = (4, 4, False)
+
+rotationDirectionToSymmetry :: (Integral i) =>
+  RotationDirection -> Symmetry i
+rotationDirectionToSymmetry LeftRotation = rotate90Symmetry
+rotationDirectionToSymmetry RightRotation = rotate270Symmetry
 
 rotationDirectionToMatrixSymmetry :: (Ix i, Integral i, IArray a e) =>
   RotationDirection -> MatrixSymmetry a i e
@@ -170,19 +183,21 @@ get5InARow except board = foldl' mplus Nothing
   $ map (get5InARow' except)
   $ map (\i -> subarray ((0, i), (5, i)) board) [0..5]
 
-betterGet5InARow :: (Eq e, IArray a e) => e -> a (Int, Int) e -> Maybe e
-betterGet5InARow except board = foldl' mplus Nothing 
+betterGet5InARow :: (Eq e, IArray a e)
+  => [Int] -> e -> a (Int, Int) e -> Maybe e
+betterGet5InARow rows except board = foldl' mplus Nothing 
   $ map (betterGet5InARow' except)
-  $ map (\y -> (ixmap (0, 5) (\x -> (x, y)) board))  [0..5]
+  $ map (\y -> (ixmap (0, 5) (\x -> (x, y)) board)) rows
 
 get5InAColumn :: (Eq e, IArray a e) => e -> a (Int, Int) e -> Maybe e
 get5InAColumn except board = foldl' mplus Nothing $ map (get5InARow' except)
   $ map (\i -> subarray ((i, 0), (i, 5)) board) [0..5]
 
-betterGet5InAColumn :: (Eq e, IArray a e) => e -> a (Int, Int) e -> Maybe e
-betterGet5InAColumn except board = foldl' mplus Nothing
+betterGet5InAColumn :: (Eq e, IArray a e)
+  => [Int] -> e -> a (Int, Int) e -> Maybe e
+betterGet5InAColumn cols except board = foldl' mplus Nothing
   $ map (betterGet5InARow' except)
-  $ map (\x -> (ixmap (0, 5) (\y -> (x, y)) board)) [0..5]
+  $ map (\x -> (ixmap (0, 5) (\y -> (x, y)) board)) cols
 
 get5InARow' except row = do
   elem <- get5RepeatingElementsFrom6ElementList (rowToList row)
@@ -198,7 +213,8 @@ betterGet5InARow' except row = do
 
 get5LRAcross except board = foldl' mplus Nothing $
   map (getTheList5SamePositions except . rowToList) [rowA, rowB, rowC]
-  where rowA = ixmap (0, 5) (\i -> (i, i)) board
+  where 
+        rowA = ixmap (0, 5) (\i -> (i, i)) board
         rowB = ixmap (0, 4) (\i -> (i + 1, i)) board
         rowC = ixmap (0, 4) (\i -> (i, i + 1)) board
 
@@ -241,8 +257,8 @@ instance GameState SimpleGameState where
 
   getResult state = mplus 
     (fmap positionToResult (foldl' mplus Nothing [
-      betterGet5InARow Empty curBoard,
-      betterGet5InAColumn Empty curBoard,
+      betterGet5InARow [0..5] Empty curBoard,
+      betterGet5InAColumn [0..5] Empty curBoard,
       get5LRAcross Empty curBoard,
       get5RLAcross Empty curBoard]))
     (if length (getPossiblePlacementOrders state) == 0
@@ -311,8 +327,8 @@ instance GameState UnboxedGameState where
 
   getResult state = mplus
     (fmap (positionToResult . charToPosition) (foldl' mplus Nothing [
-      betterGet5InARow emptyChar curBoard,
-      betterGet5InAColumn emptyChar curBoard,
+      betterGet5InARow [0..5] emptyChar curBoard,
+      betterGet5InAColumn [0..5] emptyChar curBoard,
       get5LRAcross emptyChar curBoard,
       get5RLAcross emptyChar curBoard]))
     (if length (getPossiblePlacementOrders state) == 0
@@ -342,6 +358,75 @@ instance GameState UnboxedGameState where
                   where curBoard = unboxedBoardArray state
 
 initialUnboxedGameState = UnboxedGameState (emptyBoard . positionToChar $ Empty)
+
+-- Smart board
+--
+
+-- | GameState which uses unboxed array as board representation and store
+-- evaluation of some functions.
+data SmartGameState = SmartGameState {
+  smartBoardArray :: UnboxedBoardArray
+  , possiblePlacementsOrders :: [PlacementOrder]
+  , result :: Maybe Result
+  , turn :: Maybe Player
+} deriving (Eq, Ord, Show)
+
+instance GameState SmartGameState where
+  getBoardArray = unboxedToBoxedBoardArray . smartBoardArray
+
+  getPossiblePlacementOrders = possiblePlacementsOrders
+
+  getResult = result
+
+  makeMove (pos, rot) state =
+    if curBoard ! pos == emptyChar
+    then
+      SmartGameState 
+        nextBoard
+        nextPossiblePlacementsOrders
+        nextResult
+        nextTurn
+    else undefined
+    where 
+      curBoard = smartBoardArray state
+      emptyChar = positionToChar Empty
+      curPosition = case turn state of
+                      Just WhitePlayer -> White
+                      Just BlackPlayer -> Black
+      token = positionToChar curPosition
+      nextBoard = (rotateQuadrant rot . placeToken pos token $ curBoard)
+      symmetry = boundSymmetry
+        (quadrantToBounds (fst rot))
+        (rotationDirectionToSymmetry (snd rot))
+        (quadrantToCenter (fst rot))
+      changedPos = symmetry pos
+      nextPossiblePlacementsOrders' = filter
+        (/= pos)
+        (getPossiblePlacementOrders state)
+      nextPossiblePlacementsOrders = map symmetry nextPossiblePlacementsOrders'
+      nextResult = mplus
+        (fmap (positionToResult . charToPosition) (foldl' mplus Nothing [
+          betterGet5InARow [snd changedPos] emptyChar nextBoard,
+          betterGet5InAColumn [fst changedPos] emptyChar nextBoard,
+          get5LRAcross emptyChar nextBoard,
+          get5RLAcross emptyChar nextBoard]))
+        (if length nextPossiblePlacementsOrders == 0
+         then Just Draw
+         else Nothing)
+      nextTurn =
+        if isNothing nextResult
+        then case curPosition of
+          White -> Just BlackPlayer
+          Black -> Just WhitePlayer
+        else Nothing
+
+  whoseTurn = turn
+
+initialSmartGameState = SmartGameState
+  (emptyBoard . positionToChar $ Empty)
+  allPlacementOrders
+  Nothing
+  (Just WhitePlayer)
 
 -- Board printing
 

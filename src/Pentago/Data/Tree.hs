@@ -42,7 +42,7 @@ instance Traversable (LeafValueTree e) where
   sequenceA (Node xs) = Node <$> sequenceA fList -- xs :: [(e, T e (f v))]
     where 
       efTList = map (fmap sequenceA) xs -- [(e, f T e v)]
-      fList = map (\(e, fT) -> (\t -> (e, t)) <$> fT) efTList -- f [(e, T e v)]
+      fList = map (\(e, fT) -> (\t -> (e, t)) <$> fT) efTList -- [f (e, T e v)]
 
 instance (Show e, Show v) => Show (LeafValueTree e v) where
   show = showWithPrefix ""

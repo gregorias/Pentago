@@ -118,6 +118,16 @@ randomPlay state = case getResult state of
     randomPlay $ makeMove moveOrder state
   Just result -> return (state, result)
 
+randomPlay' :: (GameState s, RandomGen g)
+  => s
+  -> State g (s, MoveOrder)
+randomPlay' state = case getResult state of
+  Nothing -> do
+    let possibleMoveOrders = getPossibleMoveOrders state
+    moveOrder <- randomElement possibleMoveOrders
+    return $ (makeMove moveOrder state, moveOrder)
+  Just result -> return (state, ((0,0), (RightTop, RightRotation)))
+
 -- | Pentago player is a function from current game state to monadic evaluation
 -- returning next game state
 type Player m s = s -> m s
@@ -139,7 +149,7 @@ aiEvaluate stateEvaluation depth state =
 randomAIPlayer :: (GameState s, RandomGen g) => AIPlayer s g
 randomAIPlayer state = 
   let possibleMovesCount = length $ getPossiblePlacementOrders state
-      depth = if possibleMovesCount > 15
+      depth = if possibleMovesCount > 10
               then 1
               else if possibleMovesCount > 5
               then 2
@@ -155,7 +165,7 @@ randomAIPlayer state =
 trivialAIPlayer :: (GameState s, RandomGen g) => AIPlayer s g
 trivialAIPlayer state = 
   let possibleMovesCount = length $ getPossiblePlacementOrders state
-      depth = if possibleMovesCount > 15
+      depth = if possibleMovesCount > 20
               then 2
               else if possibleMovesCount > 5
               then 3

@@ -1,3 +1,9 @@
+{-
+Module : Main
+Description : UI and top level game loop
+
+Module which handles UI and top level game loop.
+-}
 module Main(
   module Main,
   module Pentago.Data.Matrix,
@@ -25,57 +31,8 @@ import Text.ParserCombinators.Parsec
 import Text.Parsec.Char
 import System.Random
 
-faultyGame = 
-  makeMove ((5,1), (LeftTop, RightRotation))
-  . makeMove ((5,2), (RightBottom, LeftRotation))
-  . makeMove ((5,0), (RightBottom, RightRotation))
-  . makeMove ((4,2), (RightBottom, LeftRotation))
-  . makeMove ((4,0), (RightBottom, RightRotation))
-  . makeMove ((5,3), (RightTop, LeftRotation))
-  . makeMove ((4,1), (RightTop, RightRotation))
-  . makeMove ((5,4), (RightTop, LeftRotation))
-  . makeMove ((3,2), (RightTop, RightRotation))
-  . makeMove ((5,5), (RightTop, RightRotation))
-  . makeMove ((2,5), (RightTop, RightRotation))
-  . makeMove ((4,5), (RightTop, RightRotation))
-  . makeMove ((2,4), (RightTop, RightRotation))
-  . makeMove ((3,5), (RightTop, RightRotation))
-  . makeMove ((1,4), (RightTop, RightRotation))
-  . makeMove ((2,3), (RightTop, RightRotation))
-  . makeMove ((1,3), (RightTop, RightRotation))
-  . makeMove ((2,2), (RightTop, RightRotation))
-  . makeMove ((2,1), (RightTop, RightRotation))
-  . makeMove ((1,1), (RightTop, RightRotation))
-  $ initialUnboxedGameState
-{-------------------------
-| . | . | . | . | x | x |
--------------------------
-| . | o | . | . | x | x |
--------------------------
-| o | x | . | x | o | o |
--------------------------
-| . | x | o | . | . | o |
--------------------------
-| . | x | x | . | . | o |
--------------------------
-| . | . | x | o | o | o |
--------------------------}
---
-{-------------------------
-| . | . | . | x | . | . |
--------------------------
-| . | o | . | o | x | x |
--------------------------
-| o | x | . | o | x | x |
--------------------------
-| . | x | o | o | . | o |
--------------------------
-| . | x | x | . | . | o |
--------------------------
-| . | . | x | o | o | o |
--------------------------}
-
------ Data.Pentago
+type GameStateType = SmartGameState
+initialGameState = initialSmartGameState
     
 {- main = runStateT mainMenu
   (MainMenuState 
@@ -84,17 +41,16 @@ faultyGame =
 
 main = trialGame
 
+-- |IO Monad which runs a game between two AI players.
 trialGame = runStateT runGame
-      $ SessionState initialUnboxedGameState (mkStdGen 0)
-      (Player (aiPlayerWrapper AP.randomAIPlayer) "AI 0")
-      (Player (aiPlayerWrapper AP.randomAIPlayer) "AI 1")
+      $ SessionState initialGameState (mkStdGen 0)
+      (Player (aiPlayerWrapper AP.trivialAIPlayer) "AI 0")
+      (Player (aiPlayerWrapper AP.trivialAIPlayer) "AI 1")
 
 -- main menu
-type ChosenGameStateType = UnboxedGameState
-
 data MainMenuState = MainMenuState {
-  firstPlayer :: Player ChosenGameStateType,
-  secondPlayer :: Player ChosenGameStateType
+  firstPlayer :: Player GameStateType,
+  secondPlayer :: Player GameStateType
 }
 
 mainMenuString =
@@ -114,7 +70,7 @@ mainMenu = do
     lift $ do
       stdGen <- newStdGen
       runStateT runGame
-        $ SessionState initialUnboxedGameState stdGen curPlayer nextPlayer
+        $ SessionState initialGameState stdGen curPlayer nextPlayer
     mainMenu
   else if option == '2'
   then do
@@ -147,6 +103,7 @@ configurationMenuMainLoop = do
   putStr configurationMenuString
   head <$> getLine
 
+-- |Configuration menu allowing user to choose player types.
 configurationMenu :: StateT MainMenuState IO ()
 configurationMenu = do
   mainMenuState <- get
@@ -176,17 +133,18 @@ configurationMenu = do
 -- runGame
 
 data Player s = Player {
-  playerWrapper :: PlayerWrapper s,
-  name :: String
+  playerWrapper :: PlayerWrapper s -- ^Wrapper for player function
+  , name :: String -- ^Human readable player name
 }
   
 data SessionState = SessionState {
-  gameState :: ChosenGameStateType,
+  gameState :: GameStateType,
   randomGen :: StdGen,
-  curPlayer :: Player ChosenGameStateType,
-  nextPlayer :: Player ChosenGameStateType
+  curPlayer :: Player GameStateType,
+  nextPlayer :: Player GameStateType
 }
 
+-- |Runs a game between two players displaying current board betwen moves.
 runGame :: StateT SessionState IO ()
 runGame = do
   sessionState <- get
@@ -216,6 +174,8 @@ runGame = do
 
 type PlayerWrapperMonad = StateT StdGen IO
 
+-- |Wrapper for Pentago.AI.Pentago.Player function which unifies monads used by
+-- AI and human player.
 type PlayerWrapper s = AP.Player PlayerWrapperMonad s
 
 aiPlayerWrapper :: (GameState s) => AP.AIPlayer s StdGen -> PlayerWrapper s
