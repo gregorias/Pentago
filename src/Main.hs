@@ -34,17 +34,17 @@ import System.Random
 type GameStateType = SmartGameState
 initialGameState = initialSmartGameState
     
-{- main = runStateT mainMenu
+main = runStateT mainMenu
   (MainMenuState 
-    (Player (aiPlayerWrapper AP.randomAIPlayer) "AI 0")
-    (Player (aiPlayerWrapper AP.randomAIPlayer) "AI 1")) -}
+    (Player humanPlayerWrapper "Human 0")
+    (Player (aiPlayerWrapper $ AP.trivialAIPlayer 3) "AI 1"))
 
-main = trialGame
+-- main = trialGame
 
 -- |IO Monad which runs a game between two AI players.
 trialGame = runStateT runGame
       $ SessionState initialGameState (mkStdGen 0)
-      (Player (aiPlayerWrapper $ AP.randomAIPlayer) "AI 0")
+      (Player (aiPlayerWrapper $ AP.trivialAIPlayer 3) "AI 0")
       (Player (aiPlayerWrapper $ AP.randomAIPlayer) "AI 1")
 
 -- main menu
@@ -84,7 +84,7 @@ mainMenu = do
 switchPlayer :: (GameState s) => Player s -> Player s
 switchPlayer player = 
   if playerName == "Human"
-  then Player (aiPlayerWrapper AP.randomAIPlayer) ("AI " ++ idx)
+  then Player (aiPlayerWrapper $ AP.trivialAIPlayer 3) ("AI " ++ idx)
   else Player (humanPlayerWrapper) ("Human " ++ idx)
   where (playerName:(idx:[])) = words $ name player
 
