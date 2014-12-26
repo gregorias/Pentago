@@ -35,3 +35,26 @@ readability
 -- create docs
 -- when human makes invalid move it should notify and loop
 
+-- With state tree:
+  trivial 2 && random (>20 -> 1)  : 43s (user)
+  random && random (>20 -> 1)  : 43s
+
+-- PROFILING
+  how inherited includes also the time 
+
+  1. Show that the profiling time shows that leak happens:
+    sequenceA increase in -hc
+      This is under trivial! (after board is displayed)
+    SYSTEM in -hr <-- some kind 
+    BLACKHOLE in -hy <-- evaluating thunk (strengthened by
+
+    seq on newPlayerstate forces the overflow!
+    It must be generating the generator.
+
+  2. Method:
+    cabal configure --enable-executable-profiling
+    ./Pentago +RTS -p -hc -cost centre memory
+    ./Pentago +RTS -p -hr -retainer information (who holds it, image and prof))
+    ./Pentago +RTS -p -hy
+
+

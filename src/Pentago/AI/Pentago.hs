@@ -89,7 +89,7 @@ blackEvaluate state = pure $ fromFloat (-1.0)
 randomPlayEvaluate :: (GameState s, RandomGen g)
   => GameStateEvaluation s (State g)
 randomPlayEvaluate state = do
-  let gameCount = 10
+  let gameCount = 2
   plays <- Control.Monad.State.forM [1..gameCount] (\_ -> randomPlay state)
   let (whiteWins, blackWins) = Data.List.foldl'
        (\acc (_, result) -> case result of
@@ -149,7 +149,7 @@ aiEvaluate stateEvaluation depth state =
 randomAIPlayer :: (GameState s, RandomGen g) => AIPlayer s g
 randomAIPlayer state = 
   let possibleMovesCount = length $ getPossiblePlacementOrders state
-      depth = if possibleMovesCount > 10
+      depth = if possibleMovesCount > 20
               then 1
               else if possibleMovesCount > 5
               then 2
@@ -162,14 +162,12 @@ randomAIPlayer state =
       <$> (aiEvaluate randomPlayEvaluate) depth state
     return $ makeMove (fromJust maybeMove) state
 
-trivialAIPlayer :: (GameState s, RandomGen g) => AIPlayer s g
-trivialAIPlayer state = 
+trivialAIPlayer :: (GameState s, RandomGen g) => Int -> AIPlayer s g
+trivialAIPlayer initialDepth state = 
   let possibleMovesCount = length $ getPossiblePlacementOrders state
-      depth = if possibleMovesCount > 20
-              then 2
-              else if possibleMovesCount > 5
-              then 3
-              else 4
+      depth = if possibleMovesCount > 10
+              then initialDepth
+              else initialDepth + 1
       minMaxFunction = if fromJust (whoseTurn state) == BlackPlayer
                        then minimize
                        else maximize

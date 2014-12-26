@@ -394,7 +394,7 @@ instance GameState SmartGameState where
                       Just WhitePlayer -> White
                       Just BlackPlayer -> Black
       token = positionToChar curPosition
-      nextBoard = (rotateQuadrant rot . placeToken pos token $ curBoard)
+      nextBoard = (rotateBoundedQuadrant rot . placeToken pos token $ curBoard)
       symmetry = boundSymmetry
         (quadrantToBounds (fst rot))
         (rotationDirectionToSymmetry (snd rot))

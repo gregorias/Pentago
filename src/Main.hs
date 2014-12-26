@@ -44,8 +44,8 @@ main = trialGame
 -- |IO Monad which runs a game between two AI players.
 trialGame = runStateT runGame
       $ SessionState initialGameState (mkStdGen 0)
-      (Player (aiPlayerWrapper AP.trivialAIPlayer) "AI 0")
-      (Player (aiPlayerWrapper AP.trivialAIPlayer) "AI 1")
+      (Player (aiPlayerWrapper $ AP.randomAIPlayer) "AI 0")
+      (Player (aiPlayerWrapper $ AP.randomAIPlayer) "AI 1")
 
 -- main menu
 data MainMenuState = MainMenuState {
@@ -167,7 +167,7 @@ runGame = do
       $ (randomGen sessionState)
     put $ SessionState
       newGameState
-      (newPlayerState)
+      newPlayerState
       (nextPlayer sessionState)
       (curPlayer sessionState)
     runGame
