@@ -39,6 +39,10 @@ readability
   trivial 2 && random (>20 -> 1)  : 43s (user)
   random && random (>20 -> 1)  : 43s
 
+  new
+  trivial 2 && random (>20 -> 1)  : 2s (user)
+  random && random (>20 -> 1)  : 2s
+
 -- PROFILING
   how inherited includes also the time 
 

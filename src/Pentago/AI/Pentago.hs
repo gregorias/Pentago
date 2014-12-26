@@ -67,28 +67,35 @@ type Score = BoundedFloat
 
 type PentagoEvaluationTree = LeafValueTree MoveOrder Score
 
-evaluateTree :: (GameState s, Applicative f) => (s -> f Score)
-  -> PentagoGameTree s
-  -> f PentagoEvaluationTree
-evaluateTree evaluateF gameTree = traverse evaluateF leafTree
-  where
-    leafTree = toLeafValueTree gameTree
+evaluateTree :: (s -> Score) -> LeafValueTree MoveOrder s -> PentagoEvaluationTree
+evaluateTree evaluateF = fmap evaluateF
 
-type GameStateEvaluation s f = s -> f Score
+splitRandomGenOverTree :: (RandomGen g)
+  => g
+  -> LeafValueTree e s
+  -> LeafValueTree e (s, g)
+splitRandomGenOverTree g (Leaf s) = Leaf (s, g)
+splitRandomGenOverTree g (Node xs) = Node $
+  fmap fst . tail $ scanl scanF (undefined, g) xs
+  where 
+    scanF (_, g) (e, t) = ((e, splitRandomGenOverTree g0 t), g1)
+      where (g0, g1) = split g
 
-trivialEvaluate :: (GameState s, Applicative f) => GameStateEvaluation s f
+type GameStateEvaluation s = s -> Score
+
+trivialEvaluate :: (GameState s) => GameStateEvaluation s
 trivialEvaluate state = case getResult state of
-  Nothing -> pure $ fromFloat 0.0
-  Just Draw -> pure $ fromFloat (0.0)
-  Just WhiteWin -> pure $ fromFloat 1.0
-  Just BlackWin -> pure $ fromFloat (-1.0)
+  Nothing -> fromFloat 0.0
+  Just Draw -> fromFloat 0.0
+  Just WhiteWin -> fromFloat 1.0
+  Just BlackWin -> fromFloat (-1.0)
 
-blackEvaluate :: (GameState s, Applicative f) => GameStateEvaluation s f
-blackEvaluate state = pure $ fromFloat (-1.0)
+blackEvaluate :: GameState s => GameStateEvaluation s
+blackEvaluate state = fromFloat (-1.0)
 
 randomPlayEvaluate :: (GameState s, RandomGen g)
-  => GameStateEvaluation s (State g)
-randomPlayEvaluate state = do
+  => GameStateEvaluation (s, g)
+randomPlayEvaluate (state, gen) = fst $ runState (do
   let gameCount = 2
   plays <- Control.Monad.State.forM [1..gameCount] (\_ -> randomPlay state)
   let (whiteWins, blackWins) = Data.List.foldl'
@@ -98,7 +105,8 @@ randomPlayEvaluate state = do
          Draw -> acc)
        (0,0)
        plays
-  return . fromFloat $ (whiteWins - blackWins) / gameCount
+  return . fromFloat $ (whiteWins - blackWins) / gameCount)
+  gen
 
 randomElement :: (RandomGen g) => [a] -> State g a
 randomElement list = do
@@ -118,16 +126,6 @@ randomPlay state = case getResult state of
     randomPlay $ makeMove moveOrder state
   Just result -> return (state, result)
 
-randomPlay' :: (GameState s, RandomGen g)
-  => s
-  -> State g (s, MoveOrder)
-randomPlay' state = case getResult state of
-  Nothing -> do
-    let possibleMoveOrders = getPossibleMoveOrders state
-    moveOrder <- randomElement possibleMoveOrders
-    return $ (makeMove moveOrder state, moveOrder)
-  Just result -> return (state, ((0,0), (RightTop, RightRotation)))
-
 -- | Pentago player is a function from current game state to monadic evaluation
 -- returning next game state
 type Player m s = s -> m s
@@ -136,13 +134,15 @@ type HumanPlayer s = Pentago.AI.Pentago.Player IO s
 
 type AIPlayer s g = Pentago.AI.Pentago.Player (State g) s
 
-aiEvaluate :: (GameState s, RandomGen g)
-  => GameStateEvaluation s (State g)
+aiEvaluate :: (GameState s) 
+  => GameStateEvaluation s'
+  -> (PentagoGameTree s -> LeafValueTree MoveOrder s')
   -> Int
   -> s
-  -> State g PentagoEvaluationTree
-aiEvaluate stateEvaluation depth state =
+  -> PentagoEvaluationTree
+aiEvaluate stateEvaluation toLeafValueF depth state =
   evaluateTree stateEvaluation
+  . toLeafValueF
   . prune depth
   . generatePentagoGameTree $ state
 
@@ -158,8 +158,15 @@ randomAIPlayer state =
                        then minimize
                        else maximize
   in  do
-    (v, maybeMove) <- minMaxFunction
-      <$> (aiEvaluate randomPlayEvaluate) depth state
+    gen <- get
+    let (gen0, gen1) = split gen
+        (v, maybeMove) = minMaxFunction
+                           $ aiEvaluate
+                               randomPlayEvaluate
+                               (splitRandomGenOverTree gen0 . toLeafValueTree)
+                               depth
+                               state
+    put gen1
     return $ makeMove (fromJust maybeMove) state
 
 trivialAIPlayer :: (GameState s, RandomGen g) => Int -> AIPlayer s g
@@ -172,6 +179,10 @@ trivialAIPlayer initialDepth state =
                        then minimize
                        else maximize
   in  do
-    (v, maybeMove) <- minMaxFunction
-      <$> (aiEvaluate trivialEvaluate) depth state
+    let (v, maybeMove) = minMaxFunction
+                           $ aiEvaluate
+                              trivialEvaluate
+                              toLeafValueTree
+                              depth
+                              state
     return $ makeMove (fromJust maybeMove) state
