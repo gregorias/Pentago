@@ -5,7 +5,7 @@ Description : UI and top level game loop
 Module which handles UI and top level game loop.
 -}
 module Main(
-  module Main,
+  main,
   module Pentago.Data.Matrix,
   module Pentago.Data.Pentago,
   module Pentago.Data.Tree,
@@ -42,10 +42,10 @@ main = runStateT mainMenu
 -- main = trialGame
 
 -- |IO Monad which runs a game between two AI players.
-trialGame = runStateT runGame
+{- trialGame = runStateT runGame
       $ SessionState initialGameState (mkStdGen 0)
-      (Player (aiPlayerWrapper $ AP.trivialAIPlayer 3) "AI 0")
-      (Player (aiPlayerWrapper $ AP.randomAIPlayer) "AI 1")
+      (Player (aiPlayerWrapper $ AP.trivialAIPlayer 4) "AI 0")
+      (Player (aiPlayerWrapper $ AP.trivialAIPlayer 4) "AI 1") -}
 
 -- main menu
 data MainMenuState = MainMenuState {

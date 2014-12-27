@@ -18,7 +18,13 @@ import Pentago.Data.Pentago hiding (Player)
 import Pentago.Data.Tree
 
 import Control.Applicative
+import Control.Monad
+import Control.Monad.ST
 import Control.Monad.State
+import Data.Array (array)
+import Data.Array.Base
+import Data.Array.IArray
+import Data.Array.ST
 import Data.Foldable
 import Data.Function
 import Data.List
@@ -28,6 +34,8 @@ import Data.Tuple
 import Data.Traversable
 import System.Random
 import qualified Data.Set
+
+import Data.STRef
 
 type PentagoGameTree s = EdgeTree MoveOrder s
 
@@ -52,6 +60,66 @@ sizeOfGameTree = Data.Foldable.foldl' (+) 0 . fmap (const 1)
 prune :: Int -> PentagoGameTree s -> PentagoGameTree s
 prune 0 (ValueNode a xs) = ValueNode a []
 prune d (ValueNode a xs) = ValueNode a $ map (fmap $ prune (d - 1)) xs
+
+randomElement :: (RandomGen g) => [a] -> State g a
+randomElement list = do
+  let n = length list
+  gen <- get
+  let (idx, newGen) = randomR (0, n-1) gen
+  put newGen
+  return $ list !! idx
+
+-- Copied from https://www.haskell.org/haskellwiki/Random_shuffle
+-- | Randomly shuffle a list without the IO Monad
+--   /O(N)/
+shuffle' :: (RandomGen g) => [a] -> g -> ([a], g)
+shuffle' xs gen = runST $ do
+        g <- newSTRef gen
+        let randomRST lohi = do
+              (a,s') <- liftM (randomR lohi) (readSTRef g)
+              writeSTRef g s'
+              return a
+        ar <- newArray n xs
+        xs' <- Control.Monad.forM [1..n] $ \i -> do
+                j <- randomRST (i,n)
+                vi <- readArray ar i
+                vj <- readArray ar j
+                writeArray ar j vi
+                return vj
+        gen' <- readSTRef g
+        return (xs',gen')
+  where
+    n = length xs
+    newArray :: Int -> [a] -> ST s (STArray s Int a)
+    newArray n xs =  newListArray (1,n) xs
+
+forceList xs = forceList' xs 0
+
+forceList' [] n = n
+forceList' (x:xs) n = x `seq` forceList' xs (n + 1)
+
+-- | Randomly shuffle a list
+shuffle :: (RandomGen g) => [a] -> State g [a]
+shuffle [] = return []
+shuffle xs =
+  let n = length xs
+      indexes = [0..(n - 1)]
+      xsArray = Data.Array.array (0, (n - 1)) (zip indexes xs)
+  in do
+    gen <- get
+    let
+      (orderList, newGen) = shuffle' indexes gen
+      newXs = map (\i -> xsArray ! i) orderList
+    put newGen
+    return $ forceList newXs `seq` newXs
+
+shuffleFirstChildrenInATree :: (RandomGen g)
+  => LeafValueTree e v
+  -> State g (LeafValueTree e v)
+shuffleFirstChildrenInATree tree@(Leaf _) = return tree
+shuffleFirstChildrenInATree tree@(Node xs) = do
+  newXs <- shuffle xs
+  return $ (length newXs) `seq` Node newXs
 
 newtype BoundedFloat = BoundedFloat Float
   deriving (Show, Eq, Ord)
@@ -108,14 +176,6 @@ randomPlayEvaluate (state, gen) = fst $ runState (do
   return . fromFloat $ (whiteWins - blackWins) / gameCount)
   gen
 
-randomElement :: (RandomGen g) => [a] -> State g a
-randomElement list = do
-  let n = length list
-  gen <- get
-  let (idx, newGen) = randomR (0, n-1) gen
-  put newGen
-  return $ list !! idx
-
 randomPlay :: (GameState s, RandomGen g)
   => s
   -> State g (s, Result)
@@ -134,18 +194,6 @@ type HumanPlayer s = Pentago.AI.Pentago.Player IO s
 
 type AIPlayer s g = Pentago.AI.Pentago.Player (State g) s
 
-aiEvaluate :: (GameState s) 
-  => GameStateEvaluation s'
-  -> (PentagoGameTree s -> LeafValueTree MoveOrder s')
-  -> Int
-  -> s
-  -> PentagoEvaluationTree
-aiEvaluate stateEvaluation toLeafValueF depth state =
-  evaluateTree stateEvaluation
-  . toLeafValueF
-  . prune depth
-  . generatePentagoGameTree $ state
-
 randomAIPlayer :: (GameState s, RandomGen g) => AIPlayer s g
 randomAIPlayer state = 
   let possibleMovesCount = length $ getPossiblePlacementOrders state
@@ -157,20 +205,21 @@ randomAIPlayer state =
       minMaxFunction = if fromJust (whoseTurn state) == BlackPlayer
                        then minimize
                        else maximize
+      prunedLeafValueTree = toLeafValueTree
+        . prune depth
+        $ generatePentagoGameTree state 
   in  do
+    shuffledTree <- shuffleFirstChildrenInATree prunedLeafValueTree
     gen <- get
     let (gen0, gen1) = split gen
-        (v, maybeMove) = minMaxFunction
-                           $ aiEvaluate
-                               randomPlayEvaluate
-                               (splitRandomGenOverTree gen0 . toLeafValueTree)
-                               depth
-                               state
+        shuffledSplitTree = splitRandomGenOverTree gen0 shuffledTree
+        (v, maybeMove) = minMaxFunction 
+                           $ evaluateTree randomPlayEvaluate shuffledSplitTree
     put gen1
     return $ makeMove (fromJust maybeMove) state
 
 trivialAIPlayer :: (GameState s, RandomGen g) => Int -> AIPlayer s g
-trivialAIPlayer initialDepth state = 
+trivialAIPlayer initialDepth state =
   let possibleMovesCount = length $ getPossiblePlacementOrders state
       depth = if possibleMovesCount > 10
               then initialDepth
@@ -178,11 +227,11 @@ trivialAIPlayer initialDepth state =
       minMaxFunction = if fromJust (whoseTurn state) == BlackPlayer
                        then minimize
                        else maximize
+      prunedLeafValueTree = toLeafValueTree
+        . prune depth
+        $ generatePentagoGameTree state 
   in  do
+    shuffledTree <- shuffleFirstChildrenInATree prunedLeafValueTree
     let (v, maybeMove) = minMaxFunction
-                           $ aiEvaluate
-                              trivialEvaluate
-                              toLeafValueTree
-                              depth
-                              state
+                           $ evaluateTree trivialEvaluate shuffledTree
     return $ makeMove (fromJust maybeMove) state

@@ -62,3 +62,19 @@ readability
     ./Pentago +RTS -p -hy
 
 
+-- TODO mkStdGen return badly initialized struct
+-- map (\i -> randomR (0,11) (mkStdGen i)) [0..100]
+
+
+-- How this causes space leak
+shuffle xs =
+  let n = length xs
+      indexes = [0..(n - 1)]
+      xsArray = Data.Array.array (0, (n - 1)) (zip indexes xs)
+  in do
+    gen <- get
+    let
+      (orderList, newGen) = shuffle' indexes gen
+      newXs = map (\i -> xs ! i) orderList
+    put newGen
+    return newXs
