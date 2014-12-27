@@ -78,7 +78,7 @@ shuffle' xs gen = runST $ do
   where
     n = length xs
     newArray' :: Int -> [a] -> ST s (STArray s Int a)
-    newArray' m ys =  newListArray (1, m) ys
+    newArray' m = newListArray (1, m)
 
 forceList :: [a] -> Int
 forceList xs = forceList' xs 0
@@ -93,7 +93,7 @@ shuffle [] = return []
 shuffle xs =
   let n = length xs
       indexes = [0..(n - 1)]
-      xsArray = Data.Array.array (0, (n - 1)) (zip indexes xs)
+      xsArray = Data.Array.array (0, n - 1) (zip indexes xs)
   in do
     gen <- get
     let
@@ -108,7 +108,7 @@ shuffleFirstChildrenInATree :: (RandomGen g)
 shuffleFirstChildrenInATree tree@(Leaf _) = return tree
 shuffleFirstChildrenInATree (Node xs) = do
   newXs <- shuffle xs
-  return $ (length newXs) `seq` Node newXs
+  return $ length newXs `seq` Node newXs
 
 newtype BoundedFloat = BoundedFloat Float
   deriving (Show, Eq, Ord)
@@ -125,7 +125,7 @@ type Score = BoundedFloat
 type PentagoEvaluationTree = LeafValueTree MoveOrder Score
 
 evaluateTree :: (s -> Score) -> LeafValueTree MoveOrder s -> PentagoEvaluationTree
-evaluateTree evaluateF = fmap evaluateF
+evaluateTree = fmap
 
 -- |Appends to each value in LeafValueTree an indpendent random generator.
 splitRandomGenOverTree :: (RandomGen g)
@@ -150,7 +150,7 @@ trivialEvaluate gameState = case getResult gameState of
 
 randomPlayEvaluate :: (GameState s, RandomGen g)
   => GameStateEvaluation (s, g)
-randomPlayEvaluate (gameState, gen) = fst $ runState (do
+randomPlayEvaluate (gameState, gen) = evalState (do
     let gameCount = 2
     plays <- Control.Monad.State.forM
       [1..gameCount]
@@ -186,11 +186,9 @@ type AIPlayer s g = Pentago.AI.Pentago.Player (State g) s
 randomAIPlayer :: (GameState s, RandomGen g) => AIPlayer s g
 randomAIPlayer gameState = 
   let possibleMovesCount = length $ getPossiblePlacementOrders gameState
-      depth = if possibleMovesCount > 20
-              then 1
-              else if possibleMovesCount > 5
-              then 2
-              else 3
+      depth | possibleMovesCount > 20 = 1
+            | possibleMovesCount > 5 = 2
+            | otherwise = 3
       minMaxFunction = if fromJust (whoseTurn gameState) == BlackPlayer
                        then minimize
                        else maximize

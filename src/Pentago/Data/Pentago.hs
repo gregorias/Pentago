@@ -138,13 +138,12 @@ hasBoardRowSameElements board =
     firstElement = board ! 0
     secondElement = board ! 1
     lastElement = board ! 5
-    hasTheCenterSameElements = and $ map
-      (\idx -> secondElement == board ! idx) [2..4]
+    hasTheCenterSameElements = all (\idx -> secondElement == board ! idx) [2..4]
 
 getTheListSamePositions :: (Eq a) => a -> [a] -> Maybe a
 getTheListSamePositions _ [] = Nothing
 getTheListSamePositions except xs = 
-  if all id $ map ((&&) <$> (== (head xs)) <*> (/= except)) (tail xs)
+  if all ((&&) <$> (== head xs) <*> (/= except)) (tail xs)
   then Just $ head xs
   else Nothing
 
@@ -160,14 +159,13 @@ getTheList5SamePositions except (x:xs) =
 get5InARow :: (Eq e, IArray a e)
   => [Int] -> e -> a (Int, Int) e -> Maybe e
 get5InARow rows except board = foldl' mplus Nothing 
-  $ map (get5InARow' except)
-  $ map (\y -> (ixmap (0, 5) (\x -> (x, y)) board)) rows
+  $ map (get5InARow' except . (\y -> (ixmap (0, 5) (\x -> (x, y)) board))) rows
 
 get5InAColumn :: (Eq e, IArray a e)
   => [Int] -> e -> a (Int, Int) e -> Maybe e
 get5InAColumn cols except board = foldl' mplus Nothing
-  $ map (get5InARow' except)
-  $ map (\x -> (ixmap (0, 5) (\y -> (x, y)) board)) cols
+  $ map (get5InARow' except . \x -> ixmap (0, 5) (makePair x) board) cols
+  where makePair x y = (x, y)
 
 get5InARow' :: (Eq e, IArray a e) => e -> a Int e -> Maybe e
 get5InARow' except row = do
@@ -228,7 +226,7 @@ instance GameState SimpleGameState where
       get5InAColumn [0..5] Empty curBoard,
       get5LRAcross Empty curBoard,
       get5RLAcross Empty curBoard]))
-    (if length (getPossiblePlacementOrders state) == 0
+    (if null $ getPossiblePlacementOrders state
      then Just Draw
      else Nothing)
     where
@@ -306,7 +304,7 @@ instance GameState UnboxedGameState where
       get5InAColumn [0..5] emptyChar curBoard,
       get5LRAcross emptyChar curBoard,
       get5RLAcross emptyChar curBoard]))
-    (if length (getPossiblePlacementOrders state) == 0
+    (if null $ getPossiblePlacementOrders state
      then Just Draw
      else Nothing)
     where
@@ -323,8 +321,8 @@ instance GameState UnboxedGameState where
       currentTurn = whoseTurn state
       curBoard = unboxedBoardArray state
       token = case currentTurn of
-                Just WhitePlayer -> (positionToChar White)
-                Just BlackPlayer -> (positionToChar Black)
+                Just WhitePlayer -> positionToChar White
+                Just BlackPlayer -> positionToChar Black
                 Nothing -> error "Trying to make move when no player has turn."
 
   whoseTurn state | count (positionToChar Empty) curBoard == 0 = Nothing
@@ -372,7 +370,7 @@ instance GameState SmartGameState where
                       Just BlackPlayer -> Black
                       Nothing -> error "Trying to make move when no player has turn."
       token = positionToChar curPosition
-      nextBoard = (rotateBoundedQuadrant rot . placeToken pos token $ curBoard)
+      nextBoard = rotateBoundedQuadrant rot . placeToken pos token $ curBoard
       symmetry = boundSymmetry
         (quadrantToBounds (fst rot))
         (rotationDirectionToSymmetry (snd rot))
@@ -388,7 +386,7 @@ instance GameState SmartGameState where
           get5InAColumn [fst changedPos] emptyChar nextBoard,
           get5LRAcross emptyChar nextBoard,
           get5RLAcross emptyChar nextBoard]))
-        (if length nextPossiblePlacementsOrders == 0
+        (if null nextPossiblePlacementsOrders
          then Just Draw
          else Nothing)
       nextTurn =
@@ -416,7 +414,8 @@ prettyPrintPosition Black = "x"
 prettyPrintPosition Empty = "."
 
 prettyPrintRow :: [Position] -> String
-prettyPrintRow row = (foldr (\x a -> "| " ++ (prettyPrintPosition x) ++ " " ++ a) "" row)
+prettyPrintRow row =
+  foldr (\x a -> "| " ++ prettyPrintPosition x ++ " " ++ a) "" row
   ++ "|"
 
 boardToRows :: BoardArray -> [[Position]]
@@ -424,6 +423,8 @@ boardToRows board = map (\i -> elems (subarray ((0, i), (5, i)) board)) [0..5]
 
 -- | Generate a human readable string showing board array's state
 prettyShowBoard :: BoardArray -> String
-prettyShowBoard board = rowSep ++ (concat $ map (\row -> prettyPrintRow row ++ "\n" ++ rowSep) (boardToRows board))
+prettyShowBoard board = rowSep
+  ++ concatMap
+       (\row -> prettyPrintRow row ++ "\n" ++ rowSep) (boardToRows board)
   where
-    rowSep = (take 25 $ cycle ['-']) ++ "\n"
+    rowSep = take 25 (cycle "-") ++ "\n"

@@ -5,20 +5,18 @@ Description : UI and top level game loop
 Module which handles UI and top level game loop.
 -}
 module Main(
-  main,
-  module Pentago.Data.Matrix,
-  module Pentago.Data.Pentago,
-  module Pentago.Data.Tree,
-  module Pentago.AI.MinMax,
+  main
+  , module Exported
   ) where
 
-import Pentago.Data.Matrix
-import Pentago.Data.Pentago hiding (Player)
-import Pentago.Data.Tree
-import Pentago.AI.MinMax
+import Pentago.Data.Matrix as Exported
+import Pentago.Data.Pentago as Exported hiding (Player)
+import Pentago.Data.Tree as Exported
+import Pentago.AI.MinMax as Exported
 import qualified Pentago.AI.Pentago as AP
 
 import Control.Applicative
+import Control.Monad
 import Control.Monad.State
 import Data.Char
 import Text.ParserCombinators.Parsec
@@ -70,19 +68,17 @@ mainMenu = do
         $ SessionState initialGameState stdGen firstPlayer' secondPlayer'
       return ()
     mainMenu
-  else if menuOption == '2'
-  then do
-    configurationMenu
-    mainMenu
-  else
-    return ()
+  else Control.Monad.when (menuOption == '2') $
+    do
+      configurationMenu
+      mainMenu
 
 -- configuration menu
 switchPlayer :: (GameState s) => Player s -> Player s
 switchPlayer player = 
   if playerName == "Human"
   then Player (aiPlayerWrapper $ AP.trivialAIPlayer 3) ("AI " ++ idx)
-  else Player (humanPlayerWrapper) ("Human " ++ idx)
+  else Player humanPlayerWrapper ("Human " ++ idx)
   where (playerName:(idx:[])) = words $ name player
 
 configurationMenuString :: String
@@ -112,21 +108,20 @@ configurationMenu = do
     putStrLn ""
     menuOption <- configurationMenuMainLoop
     putStrLn ""
-    if menuOption == '1'
-    then return 1
-    else if menuOption == '2'
-    then return 2
-    else return 3
+    return $
+      if menuOption == '1'
+      then 1
+      else if menuOption == '2'
+      then 2
+      else 3
   if which == (1 :: Int)
   then do
     put $ MainMenuState (switchPlayer curFirstPlayer) curSecondPlayer
     configurationMenu
-  else if which == 2
-  then do
-    put $ MainMenuState curFirstPlayer (switchPlayer curSecondPlayer)
-    configurationMenu
-  else
-    return ()
+  else Control.Monad.when (which == 2) $
+    do
+      put $ MainMenuState curFirstPlayer (switchPlayer curSecondPlayer)
+      configurationMenu
 
 -- runGame
 
@@ -157,13 +152,13 @@ runGame = do
         Just WhiteWin -> "The white player has won."
         Just BlackWin -> "The black player has won."
         Nothing -> error "getResult has returned Nothing."
-    in do
+    in
       liftIO . putStrLn $ winMessage
   else do
     let curPlayerWrapper = playerWrapper . curPlayer $ sessionState
     (newGameState, newPlayerState) <- liftIO
       . runStateT (curPlayerWrapper curGameState) 
-      $ (randomGen sessionState)
+      $ randomGen sessionState
     put $ SessionState
       newGameState
       newPlayerState
@@ -178,8 +173,8 @@ type PlayerWrapperMonad = StateT StdGen IO
 type PlayerWrapper s = AP.Player PlayerWrapperMonad s
 
 aiPlayerWrapper :: (GameState s) => AP.AIPlayer s StdGen -> PlayerWrapper s
-aiPlayerWrapper aiPlayer =
-  \board -> do
+aiPlayerWrapper aiPlayer board =
+  do
     gen <- get
     let (newState, newGen) = runState (aiPlayer board) gen
     put newGen
@@ -187,7 +182,7 @@ aiPlayerWrapper aiPlayer =
 
 humanPlayer :: (GameState s) => AP.HumanPlayer s
 humanPlayer currentGameState = do
-  putStrLn $ moveHelp
+  putStrLn moveHelp
   moveOrder <- readMoveOrder
   return $ makeMove moveOrder currentGameState
 
@@ -201,7 +196,7 @@ moveHelp = "Provide move order of form posX posY quadrant rotation, "
 parsePosition :: Parser Int
 parsePosition = do
   posX <- digit
-  let diff = (ord posX) - (ord '0')
+  let diff = ord posX - ord '0'
   if diff > 5
   then
     fail "Read position is too large."
@@ -213,22 +208,19 @@ parseQuadrant = do
   lr <- oneOf "RL"
   tb <- oneOf "TB"
   let quadrant = [lr, tb]
-  if quadrant == "RT"
-  then
-    return RightTop
-  else if quadrant == "LT"
-  then
-    return LeftTop
-  else if quadrant == "LB"
-  then
-    return LeftBottom
-  else
-    return RightBottom
+  return $
+    if quadrant == "RT"
+    then RightTop
+    else if quadrant == "LT"
+    then LeftTop
+    else if quadrant == "LB"
+    then LeftBottom
+    else RightBottom
 
 parseRotation :: Parser RotationDirection
 parseRotation = do
   lr <- oneOf "RL"
-  if lr == 'R' then return RightRotation else return LeftRotation
+  return $ if lr == 'R' then RightRotation else LeftRotation
 
 parseMoveOrder :: Parser MoveOrder
 parseMoveOrder = do
@@ -247,5 +239,5 @@ readMoveOrder :: IO MoveOrder
 readMoveOrder = do
   line <- getLine
   case parse parseMoveOrder "MoveOrder Parser" line of
-    Left err -> putStrLn (show err) >> readMoveOrder
+    Left err -> print err >> readMoveOrder
     Right moveOrder -> return moveOrder

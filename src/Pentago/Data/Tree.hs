@@ -35,7 +35,7 @@ instance Functor (LeafValueTree e) where
 
 instance Foldable (LeafValueTree e) where
   foldMap f (Leaf v) = f v
-  foldMap f (Node xs) = (mconcat $ map (foldMap f . snd) xs)
+  foldMap f (Node xs) = mconcat $ map (foldMap f . snd) xs
 
 instance Traversable (LeafValueTree e) where
   sequenceA (Leaf fv) = Leaf <$> fv
@@ -52,7 +52,7 @@ instance (Show e, Show v) => Show (LeafValueTree e v) where
       showWithPrefix prefix (Node xs) = 
         Prelude.foldr
           (\(e, subtree) a ->
-            (edgeString e) ++ showWithPrefix newPrefix subtree ++ a)
+            edgeString e ++ showWithPrefix newPrefix subtree ++ a)
           ""
           xs
         where

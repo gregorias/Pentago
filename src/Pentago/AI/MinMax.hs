@@ -16,11 +16,11 @@ type SMTree e v = LeafValueTree e v
 
 -- | Find a move which maximizes eventual score value
 maximize :: (Bounded v, Ord v) => SMTree e v -> (v, Maybe e)
-maximize smTree = maximize' (minBound) (maxBound) smTree Nothing
+maximize smTree = maximize' minBound maxBound smTree Nothing
 
 -- | Find a move which minimizes eventual score value
 minimize :: (Bounded v, Ord v) => SMTree e v -> (v, Maybe e)
-minimize smTree = minimize' (minBound) (maxBound) smTree Nothing
+minimize smTree = minimize' minBound maxBound smTree Nothing
 
 maximize' :: (Bounded v, Ord v) => 
   v

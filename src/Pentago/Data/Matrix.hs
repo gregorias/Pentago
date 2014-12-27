@@ -68,10 +68,10 @@ boundSymmetry :: (Integral i, Ix i)
   => ((i, i), (i, i)) -- ^bounds for symmetry operation
   -> Symmetry i 
   -> Symmetry i
-boundSymmetry operationBounds symmetry = (\center pos ->
+boundSymmetry operationBounds symmetry center pos =
   if inRange operationBounds pos
   then symmetry center pos
-  else pos)
+  else pos
 
 -- |Group symmetry operations on square matrix
 type MatrixSymmetry a i e = a (i, i) e -> a (i,i) e
@@ -124,8 +124,8 @@ rotate270BoundedMatrix = boundedMatrixSymmetry rotate90Symmetry
 
 -- |Get subarray bounded by indexes
 subarray :: (Ix i, IArray a e) => (i, i) -> a i e -> a i e
-subarray = \newBounds -> ixmap newBounds id
+subarray newBounds = ixmap newBounds id
 
 -- |Insert subarray into array
 insertSubarray :: (Ix i, IArray a e) => a i e -> a i e -> a i e
-insertSubarray newSubarray mainArray = mainArray // (assocs newSubarray)
+insertSubarray newSubarray mainArray = mainArray // assocs newSubarray
