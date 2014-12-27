@@ -63,4 +63,4 @@ instance (Show e, Show v) => Show (LeafValueTree e v) where
 -- |Transform EdgeTree to LeafValueTree tree discarding inner node values.
 toLeafValueTree :: EdgeTree e v -> LeafValueTree e v
 toLeafValueTree (ValueNode v []) = Leaf v
-toLeafValueTree (ValueNode v xs) = Node $ (fmap . fmap $ toLeafValueTree) xs
+toLeafValueTree (ValueNode _ xs) = Node $ (fmap . fmap $ toLeafValueTree) xs

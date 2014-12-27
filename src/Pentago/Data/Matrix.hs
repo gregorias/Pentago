@@ -5,21 +5,26 @@ Description :  Basic square matrix/array operations
 Basic square matrix/array operations
 -}
 module Pentago.Data.Matrix(
-  Symmetry,
-  rotate90Symmetry,
-  rotate270Symmetry,
-  boundSymmetry,
-  MatrixSymmetry,
-  BoundedMatrixSymmetry,
-  rotate90Matrix,
-  rotate270Matrix,
-  rotate90BoundedMatrix,
-  rotate270BoundedMatrix,
-  subarray,
-  insertSubarray) where
+  Symmetry
+  , horizontalSymmetry
+  , verticalSymmetry
+  , transposeSymmetry
+  , rotate90Symmetry
+  , rotate180Symmetry
+  , rotate270Symmetry
+  , boundSymmetry
+  , MatrixSymmetry
+  , BoundedMatrixSymmetry
+  , horizontalMatrixSymmetry
+  , verticalMatrixSymmetry
+  , rotate90Matrix
+  , rotate270Matrix
+  , rotate90BoundedMatrix
+  , rotate270BoundedMatrix
+  , subarray
+  , insertSubarray) where
 
 import Data.Array.IArray
-import Data.Tuple
 
 -- |Function type containing symmetry operations on array indexes.
 type Symmetry i = (i, i, Bool)
@@ -58,16 +63,15 @@ rotate270Symmetry (cX, cY, False) (x, y) =
 rotate270Symmetry (cX, cY, True) (x, y) =
   (cX - (y - cY) + 1, cY + (x - cX))
 
+-- |Perform symmetry operation inside given bounds
 boundSymmetry :: (Integral i, Ix i)
-  => ((i, i), (i, i))
+  => ((i, i), (i, i)) -- ^bounds for symmetry operation
   -> Symmetry i 
   -> Symmetry i
-boundSymmetry bounds symmetry = (\center pos ->
-  if inRange bounds pos
+boundSymmetry operationBounds symmetry = (\center pos ->
+  if inRange operationBounds pos
   then symmetry center pos
   else pos)
-
--- TODO quickcheck that transpose . transpose = id
 
 -- |Group symmetry operations on square matrix
 type MatrixSymmetry a i e = a (i, i) e -> a (i,i) e
@@ -124,4 +128,4 @@ subarray = \newBounds -> ixmap newBounds id
 
 -- |Insert subarray into array
 insertSubarray :: (Ix i, IArray a e) => a i e -> a i e -> a i e
-insertSubarray subarray mainArray = mainArray // (assocs subarray)
+insertSubarray newSubarray mainArray = mainArray // (assocs newSubarray)

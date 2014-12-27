@@ -36,11 +36,11 @@ minimize' :: (Bounded v, Ord v) =>
   -> Maybe (v, e)
   -> (v, Maybe e)
 
-maximize' alpha beta (Leaf score) _ = (score, Nothing)
+maximize' _ _ (Leaf score) _ = (score, Nothing)
 
-maximize' alpha beta (Node []) Nothing = undefined
+maximize' _ _ (Node []) Nothing = undefined
 
-maximize' alpha beta (Node []) (Just (score, move)) = (score, Just move)
+maximize' _ _ (Node []) (Just (score, move)) = (score, Just move)
 
 maximize' alpha beta (Node ((move, childTree):xs)) acc =
   if score >= beta
@@ -55,11 +55,11 @@ maximize' alpha beta (Node ((move, childTree):xs)) acc =
         else acc
     newAlpha = max alpha score
 
-minimize' alpha beta (Leaf score) _ = (score, Nothing)
+minimize' _ _ (Leaf score) _ = (score, Nothing)
 
-minimize' alpha beta (Node []) Nothing = undefined
+minimize' _ _ (Node []) Nothing = undefined
 
-minimize' alpha beta (Node []) (Just (score, move)) = (score, Just move)
+minimize' _ _ (Node []) (Just (score, move)) = (score, Just move)
 
 minimize' alpha beta (Node ((move, childTree):xs)) acc =
   if score <= alpha

@@ -33,7 +33,6 @@ import Pentago.Data.Matrix
 import Control.Applicative
 import Control.Monad
 import Data.Array.Unboxed
-import Data.Ix
 import Data.List
 import Data.Maybe
 
@@ -94,13 +93,16 @@ rotationDirectionToBoundedMatrixSymmetry :: (Ix i, Integral i, IArray a e) =>
 rotationDirectionToBoundedMatrixSymmetry LeftRotation = rotate90BoundedMatrix
 rotationDirectionToBoundedMatrixSymmetry RightRotation = rotate270BoundedMatrix
 
+allPlacementOrders :: [PlacementOrder]
 allPlacementOrders = range ((0,0), (5,5))
 
+allRotationOrders :: [RotationOrder]
 allRotationOrders = do
   x <- [RightTop, LeftTop, LeftBottom, RightBottom]
   y <- [LeftRotation, RightRotation]
   return (x,y)
 
+allMoveOrders :: [MoveOrder]
 allMoveOrders = [(p, r) | p <- allPlacementOrders, r <- allRotationOrders]
 
 isFinished :: (GameState s) => s -> Bool
@@ -115,52 +117,29 @@ getPossibleMoveOrders state = do
 -- Array board helper functions
 
 findArrayElements :: (Eq e, Ix i, IArray a e) => e -> a i e -> [i]
-findArrayElements which array =
-  map fst $ filter ((== which) . snd) (assocs array)
+findArrayElements which a =
+  map fst $ filter ((== which) . snd) (assocs a)
 
 count :: (Eq e, Ix i, IArray a e) => e -> a i e -> Int
 count which = length . findArrayElements which
-
-rowToList row = map snd (assocs row)
-
-getRepeatingElement :: (Eq e) => [e] -> Maybe e
-getRepeatingElement [] = Nothing
-getRepeatingElement xs = 
-  if all id $ map (== (head xs)) (tail xs)
-  then Just $ head xs
-  else Nothing
-
-split6ElementList :: [a] -> (a, [a], a)
-split6ElementList (first:xs) = (first, center, last)
-  where (center, [last]) = splitAt 4 xs
-
-get5RepeatingElementsFrom6ElementList :: (Eq e) => [e] -> Maybe e
-get5RepeatingElementsFrom6ElementList xs = do
-  e <- getRepeatingElement center
-  if first == e
-  then return e
-  else if last == e
-  then return e
-  else fail "No repeating element found"
-  where (first, center, last) = split6ElementList xs
 
 hasBoardRowSameElements :: (Eq e, IArray a e)
   => a Int e -> Maybe e
 hasBoardRowSameElements board = 
   if hasTheCenterSameElements
   then 
-    if first == second
-    then Just first
-    else if last == second
-    then Just last
+    if firstElement == secondElement
+    then Just firstElement
+    else if lastElement == secondElement
+    then Just lastElement
     else Nothing
   else Nothing
   where
-    first = board ! 0
-    second = board ! 1
-    last = board ! 5
+    firstElement = board ! 0
+    secondElement = board ! 1
+    lastElement = board ! 5
     hasTheCenterSameElements = and $ map
-      (\idx -> second == board ! idx) [2..4]
+      (\idx -> secondElement == board ! idx) [2..4]
 
 getTheListSamePositions :: (Eq a) => a -> [a] -> Maybe a
 getTheListSamePositions _ [] = Nothing
@@ -178,48 +157,36 @@ getTheList5SamePositions except (x:xs) =
     `mplus` getTheList5SamePositions except xs
   where first5 = take 5 (x:xs)
 
-get5InARow :: (Eq e, IArray a e) => e -> a (Int, Int) e -> Maybe e
-get5InARow except board = foldl' mplus Nothing
-  $ map (get5InARow' except)
-  $ map (\i -> subarray ((0, i), (5, i)) board) [0..5]
-
-betterGet5InARow :: (Eq e, IArray a e)
+get5InARow :: (Eq e, IArray a e)
   => [Int] -> e -> a (Int, Int) e -> Maybe e
-betterGet5InARow rows except board = foldl' mplus Nothing 
-  $ map (betterGet5InARow' except)
+get5InARow rows except board = foldl' mplus Nothing 
+  $ map (get5InARow' except)
   $ map (\y -> (ixmap (0, 5) (\x -> (x, y)) board)) rows
 
-get5InAColumn :: (Eq e, IArray a e) => e -> a (Int, Int) e -> Maybe e
-get5InAColumn except board = foldl' mplus Nothing $ map (get5InARow' except)
-  $ map (\i -> subarray ((i, 0), (i, 5)) board) [0..5]
-
-betterGet5InAColumn :: (Eq e, IArray a e)
+get5InAColumn :: (Eq e, IArray a e)
   => [Int] -> e -> a (Int, Int) e -> Maybe e
-betterGet5InAColumn cols except board = foldl' mplus Nothing
-  $ map (betterGet5InARow' except)
+get5InAColumn cols except board = foldl' mplus Nothing
+  $ map (get5InARow' except)
   $ map (\x -> (ixmap (0, 5) (\y -> (x, y)) board)) cols
 
+get5InARow' :: (Eq e, IArray a e) => e -> a Int e -> Maybe e
 get5InARow' except row = do
-  elem <- get5RepeatingElementsFrom6ElementList (rowToList row)
-  if elem /= except
-  then return elem
+  foundElement <- hasBoardRowSameElements row
+  if foundElement /= except
+  then return foundElement
   else fail "Found only empty element"
 
-betterGet5InARow' except row = do
-  elem <- hasBoardRowSameElements row
-  if elem /= except
-  then return elem
-  else fail "Found only empty element"
-
+get5LRAcross :: (Eq e, IArray a e) => e -> a (Int, Int) e -> Maybe e
 get5LRAcross except board = foldl' mplus Nothing $
-  map (getTheList5SamePositions except . rowToList) [rowA, rowB, rowC]
+  map (getTheList5SamePositions except . elems) [rowA, rowB, rowC]
   where 
         rowA = ixmap (0, 5) (\i -> (i, i)) board
         rowB = ixmap (0, 4) (\i -> (i + 1, i)) board
         rowC = ixmap (0, 4) (\i -> (i, i + 1)) board
 
+get5RLAcross :: (Eq e, IArray a e) => e -> a (Int, Int) e -> Maybe e
 get5RLAcross except board = foldl' mplus Nothing $
-  map (getTheList5SamePositions except . rowToList) [rowA, rowB, rowC]
+  map (getTheList5SamePositions except . elems) [rowA, rowB, rowC]
   where rowA = ixmap (0, 5) (\i -> (5 - i, i)) board
         rowC = ixmap (0, 4) (\i -> (4 - i, i)) board
         rowB = ixmap (0, 4) (\i -> (5 - i,  i + 1)) board
@@ -241,7 +208,7 @@ rotateBoundedQuadrant (quadrant, rotationDirection) =
     (quadrantToBounds quadrant)
 
 placeToken :: (Ix i, IArray a e) => i -> e -> a i e -> a i e
-placeToken pos elem board = board // [(pos, elem)]
+placeToken pos token board = board // [(pos, token)]
 
 -- SimpleGameState
 
@@ -257,8 +224,8 @@ instance GameState SimpleGameState where
 
   getResult state = mplus 
     (fmap positionToResult (foldl' mplus Nothing [
-      betterGet5InARow [0..5] Empty curBoard,
-      betterGet5InAColumn [0..5] Empty curBoard,
+      get5InARow [0..5] Empty curBoard,
+      get5InAColumn [0..5] Empty curBoard,
       get5LRAcross Empty curBoard,
       get5RLAcross Empty curBoard]))
     (if length (getPossiblePlacementOrders state) == 0
@@ -277,6 +244,7 @@ instance GameState SimpleGameState where
       token = case currentTurn of
                 Just WhitePlayer -> White
                 Just BlackPlayer -> Black
+                Nothing -> error "Trying to make move when no player has turn."
 
   whoseTurn state | count Empty curBoard == 0 = Nothing
                   | count White curBoard == count Black curBoard
@@ -285,13 +253,17 @@ instance GameState SimpleGameState where
                   where curBoard = getBoardArray state
 
 emptyBoard :: (IArray a e) => e -> a (Int, Int) e
-emptyBoard emptyValue = array bounds [(i, emptyValue) | i <- range bounds]
+emptyBoard emptyValue = array
+  boardBounds
+  [(i, emptyValue) | i <- range boardBounds]
   where
-    bounds = ((0,0), (5, 5))
+    boardBounds = ((0,0), (5, 5))
 
+initialSimpleGameState :: SimpleGameState
 initialSimpleGameState = SimpleGameState (emptyBoard Empty)
 
-positionToResult Empty = undefined
+positionToResult :: Position -> Result
+positionToResult Empty = error "Empty position gives no result."
 positionToResult White = WhiteWin
 positionToResult Black = BlackWin
 
@@ -299,10 +271,13 @@ positionToResult Black = BlackWin
 
 type UnboxedBoardArray = UArray (Int, Int) Char
 
+charToPosition :: Char -> Position
 charToPosition '.' = Empty
 charToPosition 'o' = White
 charToPosition 'x' = Black
+charToPosition c = error $ "Unknown char: " ++ [c] ++ "."
 
+positionToChar :: Position -> Char
 positionToChar Empty = '.'
 positionToChar White = 'o'
 positionToChar Black = 'x'
@@ -327,8 +302,8 @@ instance GameState UnboxedGameState where
 
   getResult state = mplus
     (fmap (positionToResult . charToPosition) (foldl' mplus Nothing [
-      betterGet5InARow [0..5] emptyChar curBoard,
-      betterGet5InAColumn [0..5] emptyChar curBoard,
+      get5InARow [0..5] emptyChar curBoard,
+      get5InAColumn [0..5] emptyChar curBoard,
       get5LRAcross emptyChar curBoard,
       get5RLAcross emptyChar curBoard]))
     (if length (getPossiblePlacementOrders state) == 0
@@ -350,6 +325,7 @@ instance GameState UnboxedGameState where
       token = case currentTurn of
                 Just WhitePlayer -> (positionToChar White)
                 Just BlackPlayer -> (positionToChar Black)
+                Nothing -> error "Trying to make move when no player has turn."
 
   whoseTurn state | count (positionToChar Empty) curBoard == 0 = Nothing
                   | count (positionToChar White) curBoard
@@ -357,6 +333,7 @@ instance GameState UnboxedGameState where
                   | otherwise = Just BlackPlayer
                   where curBoard = unboxedBoardArray state
 
+initialUnboxedGameState :: UnboxedGameState
 initialUnboxedGameState = UnboxedGameState (emptyBoard . positionToChar $ Empty)
 
 -- Smart board
@@ -393,6 +370,7 @@ instance GameState SmartGameState where
       curPosition = case turn state of
                       Just WhitePlayer -> White
                       Just BlackPlayer -> Black
+                      Nothing -> error "Trying to make move when no player has turn."
       token = positionToChar curPosition
       nextBoard = (rotateBoundedQuadrant rot . placeToken pos token $ curBoard)
       symmetry = boundSymmetry
@@ -406,8 +384,8 @@ instance GameState SmartGameState where
       nextPossiblePlacementsOrders = map symmetry nextPossiblePlacementsOrders'
       nextResult = mplus
         (fmap (positionToResult . charToPosition) (foldl' mplus Nothing [
-          betterGet5InARow [snd changedPos] emptyChar nextBoard,
-          betterGet5InAColumn [fst changedPos] emptyChar nextBoard,
+          get5InARow [snd changedPos] emptyChar nextBoard,
+          get5InAColumn [fst changedPos] emptyChar nextBoard,
           get5LRAcross emptyChar nextBoard,
           get5RLAcross emptyChar nextBoard]))
         (if length nextPossiblePlacementsOrders == 0
@@ -418,10 +396,12 @@ instance GameState SmartGameState where
         then case curPosition of
           White -> Just BlackPlayer
           Black -> Just WhitePlayer
+          Empty -> error "Unexpected Empty curPosition."
         else Nothing
 
   whoseTurn = turn
 
+initialSmartGameState :: SmartGameState
 initialSmartGameState = SmartGameState
   (emptyBoard . positionToChar $ Empty)
   allPlacementOrders
@@ -430,6 +410,7 @@ initialSmartGameState = SmartGameState
 
 -- Board printing
 
+prettyPrintPosition :: Position -> String
 prettyPrintPosition White = "o"
 prettyPrintPosition Black = "x"
 prettyPrintPosition Empty = "."
