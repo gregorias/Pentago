@@ -1,47 +1,12 @@
 -- Split from min max to minmax on SMTree and evaluate
--- Usage of distinct sum types - adds conversions but increases fnction
-readability
 -- How game tree is traversable and that requires to generalise the type
 (increases reuse)
 -- How fmap . fmap . fmap can be seen as lifting
--- bounding symmetry does not help
--- How eliminating sort on board speed things up (rotation is the power)
-
--- Traversable -- Why is applicative concatenated and not monad?
--- Monads have: >>=, join, return and >>
-      return :: a -> m a
-      >>=    :: m a -> (a -> m b) -> m b (lift first argument
-      >>     :: m a -> m b -> m b 
-        >> a b = a >>= (\_ => b)
-      join   :: m m a -> m a
-        join mma = mma >>= id
-
--- TODO how to eliminate min max duality
-
-      ap  :: (a -> b) -> m a -> m b
-      ap f ma = ma >>= (\a -> return $ f a)
-
-   Applicative (have wrapped functions which you can apply)
-      pure :: a -> f a
-      <$> :: (a -> b) -> f a -> f b
-      <*> :: f (a -> b) -> f a -> f b
 
 -- I am using PlayerWrapperMonad, maybe there is a simpler solution
      
 
    Functor (lift function)
-
--- create tests
--- create docs
--- when human makes invalid move it should notify and loop
-
--- With state tree:
-  trivial 2 && random (>20 -> 1)  : 43s (user)
-  random && random (>20 -> 1)  : 43s
-
-  new
-  trivial 2 && random (>20 -> 1)  : 2s (user)
-  random && random (>20 -> 1)  : 2s
 
 -- PROFILING
   how inherited includes also the time 
