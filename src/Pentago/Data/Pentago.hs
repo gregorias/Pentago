@@ -375,15 +375,14 @@ instance GameState SmartGameState where
         (quadrantToBounds (fst rot))
         (rotationDirectionToSymmetry (snd rot))
         (quadrantToCenter (fst rot))
-      changedPos = symmetry pos
       nextPossiblePlacementsOrders' = filter
         (/= pos)
         (getPossiblePlacementOrders state)
       nextPossiblePlacementsOrders = map symmetry nextPossiblePlacementsOrders'
       nextResult = mplus
         (fmap (positionToResult . charToPosition) (foldl' mplus Nothing [
-          get5InARow [snd changedPos] emptyChar nextBoard,
-          get5InAColumn [fst changedPos] emptyChar nextBoard,
+          get5InARow [0..5] emptyChar nextBoard,
+          get5InAColumn [0..5] emptyChar nextBoard,
           get5LRAcross emptyChar nextBoard,
           get5RLAcross emptyChar nextBoard]))
         (if null nextPossiblePlacementsOrders

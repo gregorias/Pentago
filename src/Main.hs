@@ -26,7 +26,7 @@ type GameStateType = SmartGameState
 
 initialGameState :: GameStateType
 initialGameState = initialSmartGameState
-    
+
 main :: IO () 
 main = fst <$> runStateT mainMenu
   (MainMenuState 
