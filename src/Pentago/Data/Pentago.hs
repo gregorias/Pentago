@@ -33,7 +33,6 @@ import Pentago.Data.Matrix
 import Control.Applicative
 import Control.Monad
 import Data.Array.Unboxed
-import Data.List
 import Data.Maybe
 
 data Player = BlackPlayer | WhitePlayer
@@ -157,14 +156,16 @@ getTheList5SamePositions except (x:xs) =
   where first5 = take 5 (x:xs)
 
 get5InARow :: (Eq e, IArray a e)
-  => [Int] -> e -> a (Int, Int) e -> Maybe e
-get5InARow rows except board = foldl' mplus Nothing 
-  $ map (get5InARow' except . (\y -> (ixmap (0, 5) (\x -> (x, y)) board))) rows
+  => [Int] -> e -> a (Int, Int) e -> [e]
+get5InARow rows except board = mapMaybe
+  (get5InARow' except . (\y -> (ixmap (0, 5) (\x -> (x, y)) board)))
+  rows
 
 get5InAColumn :: (Eq e, IArray a e)
-  => [Int] -> e -> a (Int, Int) e -> Maybe e
-get5InAColumn cols except board = foldl' mplus Nothing
-  $ map (get5InARow' except . \x -> ixmap (0, 5) (makePair x) board) cols
+  => [Int] -> e -> a (Int, Int) e -> [e]
+get5InAColumn cols except board = mapMaybe
+  (get5InARow' except . \x -> ixmap (0, 5) (makePair x) board)
+  cols
   where makePair x y = (x, y)
 
 get5InARow' :: (Eq e, IArray a e) => e -> a Int e -> Maybe e
@@ -174,17 +175,17 @@ get5InARow' except row = do
   then return foundElement
   else fail "Found only empty element"
 
-get5LRAcross :: (Eq e, IArray a e) => e -> a (Int, Int) e -> Maybe e
-get5LRAcross except board = foldl' mplus Nothing $
-  map (getTheList5SamePositions except . elems) [rowA, rowB, rowC]
+get5LRAcross :: (Eq e, IArray a e) => e -> a (Int, Int) e -> [e]
+get5LRAcross except board =
+  mapMaybe (getTheList5SamePositions except . elems) [rowA, rowB, rowC]
   where 
         rowA = ixmap (0, 5) (\i -> (i, i)) board
         rowB = ixmap (0, 4) (\i -> (i + 1, i)) board
         rowC = ixmap (0, 4) (\i -> (i, i + 1)) board
 
-get5RLAcross :: (Eq e, IArray a e) => e -> a (Int, Int) e -> Maybe e
-get5RLAcross except board = foldl' mplus Nothing $
-  map (getTheList5SamePositions except . elems) [rowA, rowB, rowC]
+get5RLAcross :: (Eq e, IArray a e) => e -> a (Int, Int) e -> [e]
+get5RLAcross except board =
+  mapMaybe (getTheList5SamePositions except . elems) [rowA, rowB, rowC]
   where rowA = ixmap (0, 5) (\i -> (5 - i, i)) board
         rowC = ixmap (0, 4) (\i -> (4 - i, i)) board
         rowB = ixmap (0, 4) (\i -> (5 - i,  i + 1)) board
@@ -208,6 +209,26 @@ rotateBoundedQuadrant (quadrant, rotationDirection) =
 placeToken :: (Ix i, IArray a e) => i -> e -> a i e -> a i e
 placeToken pos token board = board // [(pos, token)]
 
+positionToPlayer :: Position -> Player
+positionToPlayer Black = BlackPlayer
+positionToPlayer White = WhitePlayer
+positionToPlayer Empty = undefined
+
+playerToResult :: Player -> Result
+playerToResult WhitePlayer = WhiteWin
+playerToResult BlackPlayer = BlackWin
+
+lineFivesToResult :: [Player] -> Maybe Result
+lineFivesToResult = lineFivesToResult' Nothing
+
+lineFivesToResult' :: Maybe Player -> [Player] -> Maybe Result
+lineFivesToResult' acc [] = fmap playerToResult acc
+lineFivesToResult' Nothing (x:xs) = lineFivesToResult' (Just x) xs
+lineFivesToResult' (Just p) (x:xs) =
+  if x == p
+  then lineFivesToResult' (Just p) xs
+  else Just Draw
+
 -- SimpleGameState
 
 -- | GameState which uses boxed array as board representation
@@ -221,11 +242,11 @@ instance GameState SimpleGameState where
   getPossiblePlacementOrders = findArrayElements Empty . getBoardArray
 
   getResult state = mplus 
-    (fmap positionToResult (foldl' mplus Nothing [
+    (lineFivesToResult . map positionToPlayer . concat $ [
       get5InARow [0..5] Empty curBoard,
       get5InAColumn [0..5] Empty curBoard,
       get5LRAcross Empty curBoard,
-      get5RLAcross Empty curBoard]))
+      get5RLAcross Empty curBoard])
     (if null $ getPossiblePlacementOrders state
      then Just Draw
      else Nothing)
@@ -259,11 +280,6 @@ emptyBoard emptyValue = array
 
 initialSimpleGameState :: SimpleGameState
 initialSimpleGameState = SimpleGameState (emptyBoard Empty)
-
-positionToResult :: Position -> Result
-positionToResult Empty = error "Empty position gives no result."
-positionToResult White = WhiteWin
-positionToResult Black = BlackWin
 
 -- UnboxedGameState
 
@@ -299,11 +315,11 @@ instance GameState UnboxedGameState where
     findArrayElements (positionToChar Empty) . unboxedBoardArray
 
   getResult state = mplus
-    (fmap (positionToResult . charToPosition) (foldl' mplus Nothing [
+    (lineFivesToResult . map (positionToPlayer . charToPosition) . concat $ [
       get5InARow [0..5] emptyChar curBoard,
       get5InAColumn [0..5] emptyChar curBoard,
       get5LRAcross emptyChar curBoard,
-      get5RLAcross emptyChar curBoard]))
+      get5RLAcross emptyChar curBoard])
     (if null $ getPossiblePlacementOrders state
      then Just Draw
      else Nothing)
@@ -380,11 +396,11 @@ instance GameState SmartGameState where
         (getPossiblePlacementOrders state)
       nextPossiblePlacementsOrders = map symmetry nextPossiblePlacementsOrders'
       nextResult = mplus
-        (fmap (positionToResult . charToPosition) (foldl' mplus Nothing [
+        (lineFivesToResult . map (positionToPlayer . charToPosition) . concat $ [
           get5InARow [0..5] emptyChar nextBoard,
           get5InAColumn [0..5] emptyChar nextBoard,
           get5LRAcross emptyChar nextBoard,
-          get5RLAcross emptyChar nextBoard]))
+          get5RLAcross emptyChar nextBoard])
         (if null nextPossiblePlacementsOrders
          then Just Draw
          else Nothing)

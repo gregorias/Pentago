@@ -27,11 +27,14 @@ type GameStateType = SmartGameState
 initialGameState :: GameStateType
 initialGameState = initialSmartGameState
 
+aiDifficulty :: Int
+aiDifficulty = 3
+
 main :: IO () 
 main = fst <$> runStateT mainMenu
   (MainMenuState 
     (Player humanPlayerWrapper "Human 0")
-    (Player (aiPlayerWrapper $ AP.trivialAIPlayer 3) "AI 1"))
+    (Player (aiPlayerWrapper $ AP.trivialAIPlayer aiDifficulty) "AI 1"))
 
 -- main = trialGame
 
@@ -77,7 +80,7 @@ mainMenu = do
 switchPlayer :: (GameState s) => Player s -> Player s
 switchPlayer player = 
   if playerName == "Human"
-  then Player (aiPlayerWrapper $ AP.trivialAIPlayer 3) ("AI " ++ idx)
+  then Player (aiPlayerWrapper $ AP.trivialAIPlayer aiDifficulty) ("AI " ++ idx)
   else Player humanPlayerWrapper ("Human " ++ idx)
   where (playerName:(idx:[])) = words $ name player
 
