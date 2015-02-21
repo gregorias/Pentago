@@ -1,13 +1,3 @@
--- Split from min max to minmax on SMTree and evaluate
--- How game tree is traversable and that requires to generalise the type
-(increases reuse)
--- How fmap . fmap . fmap can be seen as lifting
-
--- I am using PlayerWrapperMonad, maybe there is a simpler solution
-     
-
-   Functor (lift function)
-
 -- PROFILING
   how inherited includes also the time 
 
@@ -19,13 +9,6 @@
 
     seq on newPlayerstate forces the overflow!
     It must be generating the generator.
-
-  2. Method:
-    cabal configure --enable-executable-profiling
-    ./Pentago +RTS -p -hc -cost centre memory
-    ./Pentago +RTS -p -hr -retainer information (who holds it, image and prof))
-    ./Pentago +RTS -p -hy
-
 
 -- TODO mkStdGen return badly initialized struct
 -- map (\i -> randomR (0,11) (mkStdGen i)) [0..100]
